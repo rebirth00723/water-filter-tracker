@@ -1,26 +1,121 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f8fa;
+  --foreground: #16191d;
+  --card: #ffffff;
+  --card-foreground: #16191d;
+  --muted: #eef0f4;
+  --muted-foreground: #667085;
+  --border: #e2e5ea;
+  --input: #d8dce3;
+  --primary: #0d7490;
+  --primary-foreground: #ffffff;
+  --accent: #e0f2f7;
+  --accent-foreground: #0b5e75;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --warning: #b45309;
+  --success: #047857;
+  --ring: #0d7490;
+
+  /* 圖表固定色：原水橘、純水藍。種類顏色存在資料庫，不在此定義 */
+  --chart-raw: #f97316;
+  --chart-pure: #2563eb;
+
+  --radius: 0.75rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #0f1214;
+    --foreground: #e8eaed;
+    --card: #171b1f;
+    --card-foreground: #e8eaed;
+    --muted: #21262b;
+    --muted-foreground: #98a2b3;
+    --border: #2a3037;
+    --input: #363d45;
+    --primary: #22d3ee;
+    --primary-foreground: #04232c;
+    --accent: #123945;
+    --accent-foreground: #a5edfb;
+    --destructive: #f87171;
+    --destructive-foreground: #2a0a0a;
+    --warning: #fbbf24;
+    --success: #34d399;
+    --ring: #22d3ee;
+    --chart-raw: #fb923c;
+    --chart-pure: #60a5fa;
+  }
+}
+
+.dark {
+  --background: #0f1214;
+  --foreground: #e8eaed;
+  --card: #171b1f;
+  --card-foreground: #e8eaed;
+  --muted: #21262b;
+  --muted-foreground: #98a2b3;
+  --border: #2a3037;
+  --input: #363d45;
+  --primary: #22d3ee;
+  --primary-foreground: #04232c;
+  --accent: #123945;
+  --accent-foreground: #a5edfb;
+  --destructive: #f87171;
+  --destructive-foreground: #2a0a0a;
+  --warning: #fbbf24;
+  --success: #34d399;
+  --ring: #22d3ee;
+  --chart-raw: #fb923c;
+  --chart-pure: #60a5fa;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-ring: var(--ring);
+  --color-chart-raw: var(--chart-raw);
+  --color-chart-pure: var(--chart-pure);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 0.25rem);
+
+  /* 繁中優先的系統字體堆疊：iOS/macOS 走 PingFang TC，Windows 走微軟正黑。
+     刻意不用 next/font 載 Noto Sans TC —— 它沒有 TC 專屬 subset，會整包送出約 5MB */
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC",
+    "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 數字欄位（PPM、金額）用等寬對齊，比較好讀 */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }

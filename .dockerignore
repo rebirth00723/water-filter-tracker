@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+data
+backup
+secrets
+caddy-data
+caddy-config
+*.sqlite3*
+README.md

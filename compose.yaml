@@ -1,0 +1,60 @@
+# ============================================================
+#  淨水器耗材與水質記錄系統
+#  單一容器、單一對外埠。沒有任何必填的環境變數。
+# ============================================================
+services:
+  app:
+    image: ghcr.io/rebirth00723/water-filter-tracker:${IMAGE_TAG:-latest}
+    # 想自己編譯就把上面那行註解掉、打開這一段：
+    # build: .
+    container_name: water-filter-tracker
+    restart: unless-stopped
+
+    # 反向代理／tunnel 與本容器在同一個 docker 網路時，不需要發布任何埠 ——
+    # 直接以容器名稱路由到 http://water-filter-tracker:8085 即可。
+    # 想從區網直接連（例如作為 tunnel 斷線時的備援）再打開這一段：
+    # ports:
+    #   - "8085:8085"
+
+    # 容器不寫死執行身分，因為每台主機的 uid 都不一樣
+    #（一般 Linux 常是 1000，Synology 可能是 1026，LXC 又不同）。
+    # bind mount 寫不進去時，填入 `id -u`:`id -g` 的值：
+    # user: "1000:1000"
+
+    volumes:
+      # 資料庫與 session 金鑰。⚠️ 切勿放在 NFS／SMB 上 —— SQLite 的檔案鎖在其上
+      # 不可靠，會靜默損毀資料。
+      - ./data:/data
+      # 只有想用檔案管理 ntfy 密碼（NTFY_PASSWORD_FILE）時才需要
+      # - ./secrets:/run/secrets:ro
+
+    environment:
+      TZ: Asia/Taipei
+      DATABASE_PATH: /data/app.sqlite3
+      # 對外網址。啟用 passkey 時必填且需為帶網域的 https
+      PUBLIC_URL: ""
+      # ntfy：留空即停用通知，也可在「設定 → 管理」頁面填
+      NTFY_URL: ""
+      NTFY_TOPIC_FILTER: ""
+      NTFY_TOPIC_SECURITY: ""
+      NTFY_TOKEN: ""
+      # ⚠️ 救援用臨時密碼，留著等同永久後門，用完請移除並重啟
+      TEMP_PASSWORD: ""
+
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8085/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+# 若要加入既有的外部網路（例如 cloudflared 所在的網路），打開這一段
+# 並在 app 底下加上 `networks: [proxy]`：
+# networks:
+#   proxy:
+#     name: cloudflare_tunnel_default
+#     external: true

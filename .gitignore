@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# --- 本專案 ---
+# 機密：ntfy 的 token 或密碼（NTFY_PASSWORD_FILE 指向的檔案）放在這裡
+/secrets/
+*.secret
+
+# 資料。session.key 也在 /data/ 底下 —— 那把金鑰簽署所有登入通行證，
+# 進了 repo 等於任何人都能偽造 session
+/data/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
