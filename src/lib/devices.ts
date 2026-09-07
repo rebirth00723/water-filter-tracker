@@ -1,3 +1,4 @@
+import 'server-only'
 import { asc, eq } from 'drizzle-orm'
 import { cookies } from 'next/headers'
 import { db } from './db'

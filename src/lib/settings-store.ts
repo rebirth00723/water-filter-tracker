@@ -1,3 +1,4 @@
+import 'server-only'
 import { and, asc, count, eq, max } from 'drizzle-orm'
 import { db } from './db'
 import { categories, devices, eventItems, events, items, readings } from './db/schema'

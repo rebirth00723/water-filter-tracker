@@ -1,3 +1,4 @@
+import 'server-only'
 import { db } from './db'
 import { auditLog } from './db/schema'
 import { log } from './log'

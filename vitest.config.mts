@@ -15,7 +15,11 @@ import { defineConfig } from 'vitest/config'
  */
 export default defineConfig({
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // 見 test/server-only-shim.ts 的說明
+      'server-only': fileURLToPath(new URL('./test/server-only-shim.ts', import.meta.url)),
+    },
   },
   test: {
     include: ['src/**/*.test.ts'],

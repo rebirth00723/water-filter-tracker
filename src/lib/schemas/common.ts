@@ -52,6 +52,22 @@ export function optionalPositiveInt(max: number, label: string) {
     .refine((v) => v === null || v <= max, `${label}最多為 ${max}`)
 }
 
+/**
+ * 必填的非負整數。PPM 用這個而不是 positiveInt ——
+ * 純水的 TDS 讀數**可以是 0**（好的 RO 膜配上新的後置濾心就會是 0），
+ * 把下限設成 1 會讓最理想的那個讀數填不進去。
+ */
+export function nonNegativeInt(max: number, label: string) {
+  return z
+    .string()
+    .trim()
+    .min(1, `請填寫${label}`)
+    .transform((v) => Number(v))
+    .refine((v) => Number.isInteger(v), `${label}必須是整數`)
+    .refine((v) => v >= 0, `${label}不能是負數`)
+    .refine((v) => v <= max, `${label}最多為 ${max}`)
+}
+
 /** 必填正整數 */
 export function positiveInt(max: number, label: string) {
   return z
