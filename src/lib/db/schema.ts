@@ -175,6 +175,13 @@ export const notifyRules = sqliteTable('notify_rules', {
   template: text('template').notNull(),
   /** ntfy 1-5 */
   priority: integer('priority').notNull().default(3),
+  /**
+   * 這條規則的發送時刻（HH:MM）。留空＝沿用 settings['notify.sendTime']。
+   *
+   * 逐條可設的理由：「當天到期」的提醒你會想在出門前看到，
+   * 而「14 天前」的那則什麼時候送都無所謂 —— 綁在同一個時刻會讓前者失去意義。
+   */
+  sendTime: text('send_time'),
   enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull().$defaultFn(now),
 })

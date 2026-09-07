@@ -80,7 +80,8 @@ export function Field({
   children,
   className,
 }: {
-  label: string
+  /** ReactNode 而不是 string：標籤旁常要掛一個「由環境變數控制」的徽章 */
+  label: React.ReactNode
   htmlFor?: string
   hint?: React.ReactNode
   error?: string

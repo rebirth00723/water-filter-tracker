@@ -1,9 +1,21 @@
-import { env } from '../env'
+import 'server-only'
+import { CONFIG_KEYS, getConfig } from '../config'
 
 export type NtfyPriority = 1 | 2 | 3 | 4 | 5
 
+/**
+ * 兩條分開的訊息流。
+ *
+ * 「該換濾心了」和「有人註冊了新裝置」性質完全不同 ——
+ * 混在一起會讓後者被前者淹沒，而後者才是真的需要立刻看到的。
+ * 兩個 topic 共用同一組認證（token 或帳密）。
+ */
+export type NtfyChannel = 'filter' | 'security'
+
 export interface NtfyMessage {
-  /** 覆寫預設 topic（每台設備可有專屬 topic） */
+  /** 濾心提醒或安全事件。決定送到哪一個 topic */
+  channel?: NtfyChannel
+  /** 覆寫該頻道的 topic（設備專屬 topic，只對濾心提醒有意義） */
   topic?: string
   title?: string
   message: string
@@ -29,19 +41,39 @@ export class NtfyError extends Error {
 /** 官方允許字元：英數字、- 與 _，最長 64 */
 const TOPIC_RE = /^[-_A-Za-z0-9]{1,64}$/
 
+/**
+ * 認證。**token 優先於帳密** —— 外洩時可以單獨撤銷那一把，
+ * 而帳密外洩要改整個 ntfy 帳號的密碼，會影響其他用途。
+ *
+ * 值的來源依 getConfig() 的規則：環境變數優先，沒設才讀 machine_config。
+ */
 function authHeader(): string | undefined {
-  const token = env('NTFY_TOKEN')
+  const token = getConfig(CONFIG_KEYS.ntfyToken)
   if (token) return `Bearer ${token}`
-  const user = env('NTFY_USER')
-  const password = env('NTFY_PASSWORD')
+  const user = getConfig(CONFIG_KEYS.ntfyUser)
+  const password = getConfig(CONFIG_KEYS.ntfyPassword)
   if (user && password) {
     return `Basic ${Buffer.from(`${user}:${password}`, 'utf8').toString('base64')}`
   }
   return undefined
 }
 
-export function resolveTopic(override?: string | null): string | undefined {
-  return override?.trim() || env('NTFY_TOPIC')
+/**
+ * topic 解析順序：設備專屬 → 該頻道的設定值。
+ *
+ * 設備專屬只對濾心提醒有意義 —— 安全事件（新 passkey、憑證被刪）不綁設備，
+ * 所以呼叫端在 security 頻道不會傳 override。
+ */
+export function resolveTopic(channel: NtfyChannel, override?: string | null): string | undefined {
+  if (override?.trim()) return override.trim()
+  return getConfig(
+    channel === 'security' ? CONFIG_KEYS.ntfyTopicSecurity : CONFIG_KEYS.ntfyTopicFilter,
+  )
+}
+
+/** 通知功能是否已設定完成。沒設完就整個停用，App 照常運作 */
+export function ntfyConfigured(channel: NtfyChannel = 'filter'): boolean {
+  return Boolean(getConfig(CONFIG_KEYS.ntfyUrl) && resolveTopic(channel))
 }
 
 /**
@@ -57,14 +89,20 @@ export async function sendNtfy(
   opts: { timeoutMs?: number } = {},
 ): Promise<{ id: string; topic: string }> {
   const timeoutMs = opts.timeoutMs ?? 8000
-  const base = env('NTFY_URL')?.replace(/\/+$/, '')
-  const topic = resolveTopic(msg.topic)
+  const channel = msg.channel ?? 'filter'
+  const base = getConfig(CONFIG_KEYS.ntfyUrl)?.replace(/\/+$/, '')
+  const topic = resolveTopic(channel, msg.topic)
 
   if (!base) {
-    throw new NtfyError('尚未設定 NTFY_URL，請在 docker-compose.yml 填入 ntfy 伺服器網址', 'config')
+    throw new NtfyError('尚未設定 ntfy 伺服器網址（管理中心或 NTFY_URL）', 'config')
   }
   if (!topic) {
-    throw new NtfyError('尚未設定 NTFY_TOPIC，也沒有指定設備專屬 topic', 'config')
+    throw new NtfyError(
+      channel === 'security'
+        ? '尚未設定安全通知的 topic（管理中心或 NTFY_TOPIC_SECURITY）'
+        : '尚未設定濾心提醒的 topic（管理中心或 NTFY_TOPIC_FILTER），也沒有指定設備專屬 topic',
+      'config',
+    )
   }
   if (!TOPIC_RE.test(topic)) {
     throw new NtfyError(
@@ -130,7 +168,7 @@ export async function sendNtfy(
     }
     if (res.status === 404) {
       throw new NtfyError(
-        `ntfy 回應 404。最常見的原因是 NTFY_URL 誤填成含 topic 的網址 —— ` +
+        `ntfy 回應 404。最常見的原因是伺服器網址誤填成含 topic 的網址 —— ` +
           `JSON 發布必須送到根路徑（目前送往 ${base}/）。`,
         'http',
         404,

@@ -54,3 +54,33 @@ export async function requireSessionAllowingPasswordChange(): Promise<CurrentUse
 
   return { username: user.username, mustChangePassword: user.mustChangePassword }
 }
+
+/**
+ * `/admin` 的授權關卡。
+ *
+ * **無密碼模式下不要求 session。** 那個模式本來就沒有登入層，
+ * `/admin` 本身即為信任邊界 —— 而它是使用者事後補設密碼、
+ * 以及之後想啟用 passkey（passkey 強制要密碼）的唯一入口。
+ * 要求一個不存在的 session 會讓那條補救路完全走不通。
+ *
+ * 密碼模式下與其他頁面一樣要求有效 session。
+ */
+export async function requireAdmin(): Promise<CurrentUser & { openMode: boolean }> {
+  const mode = getAuthMode()
+  if (mode === 'uninitialized') redirect('/setup')
+
+  const user = getPrimaryUser()
+  if (!user) redirect('/setup')
+
+  if (mode === 'open') {
+    return { username: user.username, mustChangePassword: false, openMode: true }
+  }
+
+  const session = await currentSession()
+  if (!session) redirect('/login')
+  if (session.username !== user.username) redirect('/login')
+  if (session.ver !== user.tokenVersion) redirect('/login?reason=revoked')
+  if (user.mustChangePassword) redirect('/change-password')
+
+  return { username: user.username, mustChangePassword: false, openMode: false }
+}

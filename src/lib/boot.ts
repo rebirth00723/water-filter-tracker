@@ -1,6 +1,7 @@
 import { runMigrations } from './db/migrate'
 import { seedIfEmpty } from './db/seed'
 import { log } from './log'
+import { startSchedule } from './notify/schedule'
 
 const KEY = Symbol.for('ro-tracker.booted')
 const g = globalThis as unknown as Record<symbol, boolean | undefined>
@@ -19,6 +20,7 @@ export function boot() {
     const started = Date.now()
     runMigrations()
     seedIfEmpty()
+    startSchedule()
 
     // 主機時間與時區印出來：所有的到期日、通知發送時刻與 YYYY-MM-DD 都由它決定，
     // 而「差一天」的症狀看起來會像業務邏輯壞掉，第一眼先排除掉時區問題最省事。

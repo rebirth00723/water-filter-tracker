@@ -54,9 +54,16 @@ export async function initialize(username: string, password: string | null): Pro
     .run()
 }
 
-export async function setPassword(username: string, password: string): Promise<void> {
+/**
+ * 設定密碼。**收的是明文，雜湊在這裡做。**
+ *
+ * 參數叫 plainPassword 而不是 password 是刻意的：呼叫端曾經寫成
+ * `setPassword(user, await hashPassword(pw))` 而雙重雜湊 —— 兩者都是 string，
+ * 型別檢查抓不到，症狀是「設好密碼卻登不進去」。名字是唯一的防線。
+ */
+export async function setPassword(username: string, plainPassword: string): Promise<void> {
   db.update(authState)
-    .set({ passwordHash: await hashPassword(password), mustChangePassword: false })
+    .set({ passwordHash: await hashPassword(plainPassword), mustChangePassword: false })
     .where(eq(authState.username, username))
     .run()
 }

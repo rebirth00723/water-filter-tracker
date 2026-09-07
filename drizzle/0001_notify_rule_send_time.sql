@@ -1,0 +1,1 @@
+ALTER TABLE `notify_rules` ADD `send_time` text;

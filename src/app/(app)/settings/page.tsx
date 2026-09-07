@@ -1,4 +1,4 @@
-import { Bell, ChevronRight, Database, KeyRound, ScrollText, Wrench } from 'lucide-react'
+import { Bell, ChevronRight, Database, KeyRound, ScrollText, Server, Wrench } from 'lucide-react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/PageHeader'
 import { Card, Row, rowClass } from '@/components/ui'
@@ -13,7 +13,13 @@ const SECTIONS = [
     hint: '其他頁面全部依賴這裡的設定',
     ready: true,
   },
-  { href: '/settings/notifications', label: '通知規則', Icon: Bell, hint: '階段 7', ready: false },
+  {
+    href: '/settings/notifications',
+    label: '通知規則',
+    Icon: Bell,
+    hint: '提前提醒、逾期提醒、發送時刻',
+    ready: true,
+  },
   {
     href: '/settings/data',
     label: '匯出與匯入',
@@ -23,6 +29,13 @@ const SECTIONS = [
   },
   { href: '/settings/login', label: '快速登入（passkey）', Icon: KeyRound, hint: '階段 9', ready: false },
   { href: '/settings/audit', label: '操作紀錄', Icon: ScrollText, hint: '階段 10', ready: false },
+  {
+    href: '/admin',
+    label: '管理中心',
+    Icon: Server,
+    hint: '對外網址、ntfy 連線、session 金鑰',
+    ready: true,
+  },
 ] as const
 
 export default function SettingsPage() {
