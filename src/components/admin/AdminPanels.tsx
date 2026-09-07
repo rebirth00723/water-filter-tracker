@@ -20,6 +20,7 @@ import { ConfirmButton } from '@/components/forms/ConfirmButton'
 import { FormActions, FormError } from '@/components/forms/FormShell'
 import { Badge, Button, Card, CheckboxRow, Field, Input } from '@/components/ui'
 import { ntfyConfigSchema } from '@/lib/schemas/notify'
+import { PasskeyAdminPanel, type AdminCredential } from './PasskeyAdminPanel'
 
 export interface AdminState {
   openMode: boolean
@@ -36,6 +37,7 @@ export interface AdminState {
     envLocked: string[]
   }
   passkey: { eligible: boolean; reason?: string; enabled: boolean }
+  credentials: AdminCredential[]
 }
 
 /** 由環境變數控制的欄位要唯讀並明確標示，而不是讓人填了卻不生效 */
@@ -55,6 +57,11 @@ export function AdminPanels({ state }: { state: AdminState }) {
       <NtfyPanel state={state} />
       <SweepPanel />
       <PasswordPanel openMode={state.openMode} username={state.username} />
+      <PasskeyAdminPanel
+        passkey={state.passkey}
+        credentials={state.credentials}
+        openMode={state.openMode}
+      />
       <SessionKeyPanel />
     </div>
   )

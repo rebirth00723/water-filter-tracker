@@ -8,9 +8,17 @@ import { validatePassword } from '@/lib/auth/password'
 import { requireAdmin } from '@/lib/auth/require'
 import { regenerateSessionKey } from '@/lib/auth/session'
 import { bumpTokenVersion, setPassword } from '@/lib/auth/store'
-import { CONFIG_KEYS, getPublicUrl, isEnvControlled, setConfig } from '@/lib/config'
+import {
+  CONFIG_KEYS,
+  getPublicUrl,
+  isEnvControlled,
+  passkeyEligibility,
+  setConfig,
+  setPasskeyEnabled,
+} from '@/lib/config'
+import { deleteAllCredentials, deleteCredential } from '@/lib/auth/passkey'
 import { manualSweep } from '@/lib/notify/sweep'
-import { NtfyError, sendNtfy } from '@/lib/notify/ntfy'
+import { NtfyError, sendNtfy, sendNtfyQuiet } from '@/lib/notify/ntfy'
 import { ActionError, actionClient } from '@/lib/safe-action'
 import { ntfyConfigSchema, testNotifySchema } from '@/lib/schemas/notify'
 import { optionalText } from '@/lib/schemas/common'
@@ -222,4 +230,82 @@ export const regenSessionKey = adminAction
       summary: '重新產生 session 金鑰，所有已登入的裝置都已登出',
     })
     return { ok: true }
+  })
+
+// ─────────────────────────── passkey ───────────────────────────
+
+/**
+ * 全域開關。**這是系統層級的決定** —— 牽涉 PUBLIC_URL 與 https，
+ * 屬於部署而不是日常操作，所以放在 admin 而不是設定頁。
+ */
+export const setPasskeyGlobal = adminAction
+  .metadata({ name: 'admin.passkeyToggle' })
+  .inputSchema(z.object({ on: z.boolean() }))
+  .action(async ({ parsedInput: { on }, ctx }) => {
+    if (on) {
+      const eligibility = passkeyEligibility()
+      if (!eligibility.eligible) {
+        throw new ActionError(eligibility.reason ?? '目前的環境無法啟用 passkey')
+      }
+      if (ctx.user.openMode) {
+        // passkey 綁定裝置與網域，失效時密碼是唯一的退路 —— 不能只有 passkey
+        throw new ActionError(
+          '請先設定密碼。passkey 綁定裝置與網域，裝置遺失或換網域時密碼是唯一的退路，' +
+            '所以它只能作為密碼之外的快捷方式。',
+        )
+      }
+    }
+    setPasskeyEnabled(on)
+    ctx.note({
+      action: 'admin.passkeyToggle',
+      summary: on ? '啟用 passkey 快速登入' : '停用 passkey 快速登入（既有憑證保留）',
+    })
+    refresh()
+    return { on }
+  })
+
+/** 緊急撤銷。留給手機遺失這類情況，不是日常操作入口 */
+export const revokeCredential = adminAction
+  .metadata({ name: 'admin.revokeCredential' })
+  .inputSchema(z.object({ id: z.coerce.number().int().positive() }))
+  .action(async ({ parsedInput: { id }, ctx }) => {
+    const removed = deleteCredential(ctx.user.username, id)
+    if (!removed) throw new ActionError('找不到這筆憑證，可能已經被刪除')
+
+    ctx.note({
+      action: 'admin.revokeCredential',
+      summary: `撤銷 passkey「${removed.deviceLabel ?? '未命名'}」`,
+    })
+    // 憑證被刪除要推播：若不是你做的，代表有人動了你的存取控制
+    void sendNtfyQuiet({
+      channel: 'security',
+      title: 'passkey 已被撤銷',
+      message: `「${removed.deviceLabel ?? '未命名'}」已從 ${ctx.user.username} 移除。若不是你本人操作，請立刻更換密碼。`,
+      priority: 4,
+      tags: ['warning'],
+    })
+    refresh()
+    return { label: removed.deviceLabel ?? '未命名' }
+  })
+
+export const revokeAllCredentials = adminAction
+  .metadata({ name: 'admin.revokeAllCredentials' })
+  .inputSchema(z.object({}))
+  .action(async ({ ctx }) => {
+    const n = deleteAllCredentials(ctx.user.username)
+    ctx.note({
+      action: 'admin.revokeAllCredentials',
+      summary: `撤銷全部 ${n} 把 passkey`,
+    })
+    if (n > 0) {
+      void sendNtfyQuiet({
+        channel: 'security',
+        title: `${n} 把 passkey 已全部撤銷`,
+        message: `${ctx.user.username} 的所有 passkey 已移除。若不是你本人操作，請立刻更換密碼。`,
+        priority: 5,
+        tags: ['warning'],
+      })
+    }
+    refresh()
+    return { count: n }
   })

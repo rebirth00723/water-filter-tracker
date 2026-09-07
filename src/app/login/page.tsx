@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { AuthShell, ErrorNote, FieldLabel, buttonClass, inputClass } from '@/components/AuthShell'
+import { PasskeyLoginButton } from '@/components/passkey/PasskeyLoginButton'
 import { authMessage } from '@/lib/auth/messages'
 import { getAuthMode, tempPasswordPresent } from '@/lib/auth/store'
 
@@ -20,6 +21,13 @@ export default async function LoginPage({
 
   return (
     <AuthShell title="淨水器記錄">
+      {/*
+        passkey 快捷放在密碼表單「之前」。
+        有註冊過的人絕大多數會用它，而它自己會在不可用時消失，
+        所以不會在純 HTTP 的區網上佔掉一個位置。
+      */}
+      <PasskeyLoginButton next={next} />
+
       <form
         method="POST"
         action="/api/auth/login"

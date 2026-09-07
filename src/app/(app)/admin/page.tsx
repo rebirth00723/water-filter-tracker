@@ -1,5 +1,6 @@
 import { PageHeader } from '@/components/PageHeader'
 import { AdminPanels, type AdminState } from '@/components/admin/AdminPanels'
+import { listCredentials } from '@/lib/auth/passkey'
 import { requireAdmin } from '@/lib/auth/require'
 import {
   CONFIG_KEYS,
@@ -57,6 +58,14 @@ export default async function AdminPage() {
       reason: eligibility.reason,
       enabled: isPasskeyEnabled(),
     },
+    // 憑證清單即使在 passkey 停用時也顯示 —— 換網域之後使用者需要看到
+    // 「這些已經失效了」，並能一次清乾淨
+    credentials: listCredentials(user.username).map((c) => ({
+      id: c.id,
+      deviceLabel: c.deviceLabel,
+      createdAt: c.createdAt,
+      lastUsedAt: c.lastUsedAt,
+    })),
   }
 
   return (

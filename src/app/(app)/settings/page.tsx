@@ -27,7 +27,13 @@ const SECTIONS = [
     hint: 'JSON 單檔，可搬到另一台機器',
     ready: true,
   },
-  { href: '/settings/login', label: '快速登入（passkey）', Icon: KeyRound, hint: '階段 9', ready: false },
+  {
+    href: '/settings/login',
+    label: '快速登入（passkey）',
+    Icon: KeyRound,
+    hint: '用 Face ID 或 Touch ID 登入，不必打密碼',
+    ready: true,
+  },
   { href: '/settings/audit', label: '操作紀錄', Icon: ScrollText, hint: '階段 10', ready: false },
   {
     href: '/admin',
