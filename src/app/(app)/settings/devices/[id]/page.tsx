@@ -1,11 +1,11 @@
-import { ArrowLeft, QrCode } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/PageHeader'
 import { CategoryList } from '@/components/settings/CategoryList'
 import { DeviceDangerZone } from '@/components/settings/DeviceDangerZone'
 import { DeviceEditor } from '@/components/settings/DeviceEditor'
-import { Card } from '@/components/ui'
+import { DeviceQrCard } from '@/components/settings/DeviceQrCard'
 import { getPublicUrl } from '@/lib/config'
 import { devicePath, getDevice } from '@/lib/devices'
 import {
@@ -56,30 +56,11 @@ export default async function DeviceSettingsPage({ params }: PageProps<'/setting
           itemUsage={Object.fromEntries(usageByItem(id))}
         />
 
-        {/* 專屬連結與 QR Code：產生器在階段 6，但連結現在就有用 */}
-        <section>
-          <h2 className="mb-3 text-sm font-semibold">專屬連結</h2>
-          <Card className="space-y-2 px-4 py-3.5">
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              這台設備的記錄頁網址。印一張 QR 貼在機器上，掃了直接進到這一台，
-              不必記網址也不必先切換設備。
-            </p>
-            <code className="block overflow-x-auto rounded-md bg-muted px-3 py-2 text-xs">
-              {deepLink ?? devicePath(id)}
-            </code>
-            {!deepLink && (
-              <p className="text-xs text-warning">
-                尚未設定對外網址，所以只能顯示相對路徑。到管理中心填入 PUBLIC_URL
-                之後這裡才會出現可以直接掃的完整網址 ——
-                從瀏覽器當下的位址推導會產生一個掃了進不去的 QR，所以刻意不那樣做。
-              </p>
-            )}
-            <p className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
-              <QrCode className="size-4" aria-hidden />
-              QR Code 下載在階段 6 實作（圖片會燒進設備名稱）
-            </p>
-          </Card>
-        </section>
+        <DeviceQrCard
+          deviceName={device.name}
+          url={deepLink}
+          fallbackPath={devicePath(id)}
+        />
 
         <DeviceDangerZone
           deviceId={id}

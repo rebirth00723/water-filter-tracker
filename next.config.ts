@@ -39,6 +39,18 @@ const basePath = (process.env.BASE_PATH ?? '').trim().replace(/\/+$/, '')
 const nextConfig: NextConfig = {
   ...(basePath ? { basePath } : {}),
 
+  /*
+   * 把 basePath 也注入客戶端 bundle。
+   *
+   * **必要，不是方便。** `next/link` 會自動處理 basePath，但**原始的 `fetch()`
+   * 與 `<a href>` 不會** —— 那是瀏覽器 API，Next 沒有機會插手。
+   * 匯入用 fetch('/api/import')、匯出用 <a href="/api/export">，
+   * 少了前綴在子路徑部署下會打到 404，而且症狀是「按了沒反應」。
+   *
+   * 從同一個 basePath 變數推導，所以不可能與伺服端不一致。
+   */
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
+
   // 明確釘住專案根目錄：否則 Turbopack 會往上找到家目錄的 lockfile
   turbopack: { root: fileURLToPath(new URL('.', import.meta.url)) },
 

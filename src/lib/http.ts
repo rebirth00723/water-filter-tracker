@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { BASE_PATH, withBasePath } from './base-path'
 
-/** 去掉尾端斜線的 BASE_PATH，空字串代表掛在根目錄 */
-export const BASE_PATH = (process.env.BASE_PATH ?? '').trim().replace(/\/+$/, '')
+export { BASE_PATH, withBasePath } from './base-path'
 
 /**
  * 表單 POST 之後的 303 導向。
@@ -27,14 +27,3 @@ export function seeOther(path: string): NextResponse {
   })
 }
 
-/**
- * 掛在子路徑下時（`BASE_PATH=/water`）要自己補前綴。
- *
- * `next/link`、`redirect()` 與 `NextResponse.redirect()` 都會自動處理 basePath，
- * 但這裡是手工組出來的 Response，Next 沒有機會插手 —— 漏掉的話子路徑部署會導到
- * 網域根目錄，而那底下通常是另一個服務。
- */
-export function withBasePath(path: string): string {
-  if (!BASE_PATH || !path.startsWith('/')) return path
-  return `${BASE_PATH}${path}`
-}

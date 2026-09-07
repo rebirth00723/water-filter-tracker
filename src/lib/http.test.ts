@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 describe('seeOther', () => {
   it('Location 是相對路徑，不含協定與主機', async () => {
     vi.resetModules()
-    delete process.env.BASE_PATH
+    delete process.env.NEXT_PUBLIC_BASE_PATH
     const { seeOther } = await import('./http')
 
     const res = seeOther('/login?error=login_failed')
@@ -29,26 +29,26 @@ describe('seeOther', () => {
 describe('withBasePath', () => {
   it('沒設 BASE_PATH 時原樣回傳', async () => {
     vi.resetModules()
-    delete process.env.BASE_PATH
+    delete process.env.NEXT_PUBLIC_BASE_PATH
     const { withBasePath } = await import('./http')
     expect(withBasePath('/login')).toBe('/login')
     expect(withBasePath('/')).toBe('/')
   })
 
-  it('設了 BASE_PATH 時補上前綴', async () => {
+  it('設了 BASE_PATH 時補上前綴（fetch 與 <a href> 必須自己補）', async () => {
     vi.resetModules()
-    process.env.BASE_PATH = '/water'
+    process.env.NEXT_PUBLIC_BASE_PATH = '/water'
     const { withBasePath, seeOther } = await import('./http')
     expect(withBasePath('/login')).toBe('/water/login')
     expect(seeOther('/d/1').headers.get('location')).toBe('/water/d/1')
-    delete process.env.BASE_PATH
+    delete process.env.NEXT_PUBLIC_BASE_PATH
   })
 
   it('BASE_PATH 的尾端斜線會被去掉，避免產生 //', async () => {
     vi.resetModules()
-    process.env.BASE_PATH = '/water/'
+    process.env.NEXT_PUBLIC_BASE_PATH = '/water/'
     const { withBasePath } = await import('./http')
     expect(withBasePath('/login')).toBe('/water/login')
-    delete process.env.BASE_PATH
+    delete process.env.NEXT_PUBLIC_BASE_PATH
   })
 })

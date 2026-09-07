@@ -14,7 +14,13 @@ const SECTIONS = [
     ready: true,
   },
   { href: '/settings/notifications', label: '通知規則', Icon: Bell, hint: '階段 7', ready: false },
-  { href: '/settings/data', label: '匯出與匯入', Icon: Database, hint: '階段 6', ready: false },
+  {
+    href: '/settings/data',
+    label: '匯出與匯入',
+    Icon: Database,
+    hint: 'JSON 單檔，可搬到另一台機器',
+    ready: true,
+  },
   { href: '/settings/login', label: '快速登入（passkey）', Icon: KeyRound, hint: '階段 9', ready: false },
   { href: '/settings/audit', label: '操作紀錄', Icon: ScrollText, hint: '階段 10', ready: false },
 ] as const
