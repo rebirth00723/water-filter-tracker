@@ -2,6 +2,7 @@
 
 import { refresh } from 'next/cache'
 import { z } from 'zod'
+import type { AuditAction } from '@/lib/audit-groups'
 import { audit } from '@/lib/audit'
 import { clientIp, userAgent } from '@/lib/auth/client-ip'
 import { validatePassword } from '@/lib/auth/password'
@@ -38,7 +39,7 @@ const adminAction = actionClient.use(async ({ next }) => {
     ctx: {
       user,
       /** 身分欄位已填好，呼叫端只需補語意。與 authedAction 的 ctx.audit 同一個用法 */
-      note(entry: { action: string; summary: string; after?: unknown }) {
+      note(entry: { action: AuditAction; summary: string; after?: unknown }) {
         audit({ ...entry, username: user.username, ip, userAgent: ua })
       },
     },

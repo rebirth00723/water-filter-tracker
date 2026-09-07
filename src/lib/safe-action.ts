@@ -1,5 +1,6 @@
 import { createSafeActionClient } from 'next-safe-action'
 import { z } from 'zod'
+import type { AuditAction } from './audit-groups'
 import { audit, type AuditEntry } from './audit'
 import { clientIp, userAgent } from './auth/client-ip'
 import { requireUser } from './auth/require'
@@ -21,8 +22,18 @@ import { log } from './log'
  * 兩者的接點是 ctx.audit()：身分欄位已經填好，呼叫端只需要補語意。
  */
 
-/** action 的識別名稱，會成為 audit_log.action 的值（例如 device.create） */
-const metadataSchema = z.object({ name: z.string().min(1) })
+/**
+ * action 的識別名稱，會成為 audit_log.action 的值（例如 device.create）。
+ *
+ * 用 `z.custom<AuditAction>` 而不是 `z.string()`：後者的輸出型別是 string，
+ * 於是任何前綴都能通過，而操作紀錄頁上就會出現沒有分類的項目。
+ * z.custom 同時保有執行期驗證與精確的靜態型別。
+ */
+const metadataSchema = z.object({
+  name: z.custom<AuditAction>((v) => typeof v === 'string' && v.length > 0, {
+    message: 'action 名稱必須是非空字串',
+  }),
+})
 
 export class ActionError extends Error {
   constructor(message: string) {
@@ -59,7 +70,11 @@ export const authedAction = actionClient.use(async ({ next, metadata }) => {
       ip,
       userAgent: ua,
       /** 身分欄位已填好，呼叫端只需補語意。action 名稱預設取 metadata.name */
-      audit(entry: Omit<AuditEntry, 'username' | 'ip' | 'userAgent' | 'action'> & { action?: string }) {
+      audit(
+        entry: Omit<AuditEntry, 'username' | 'ip' | 'userAgent' | 'action'> & {
+          action?: AuditAction
+        },
+      ) {
         audit({
           ...entry,
           action: entry.action ?? metadata.name,

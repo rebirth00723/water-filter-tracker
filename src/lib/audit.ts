@@ -1,4 +1,5 @@
 import 'server-only'
+import type { AuditAction } from './audit-groups'
 import { db } from './db'
 import { auditLog } from './db/schema'
 import { log } from './log'
@@ -7,7 +8,11 @@ export interface AuditEntry {
   username?: string | null
   ip?: string | null
   userAgent?: string | null
-  action: string
+  /**
+   * 動作名稱。型別收窄成已知前綴 —— 新增一個沒有對應分類的動作
+   * 會在這裡編譯失敗，而不是在操作紀錄頁上默默少一個徽章。
+   */
+  action: AuditAction
   entity?: string | null
   entityId?: number | null
   summary: string

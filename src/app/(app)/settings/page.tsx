@@ -34,7 +34,13 @@ const SECTIONS = [
     hint: '用 Face ID 或 Touch ID 登入，不必打密碼',
     ready: true,
   },
-  { href: '/settings/audit', label: '操作紀錄', Icon: ScrollText, hint: '階段 10', ready: false },
+  {
+    href: '/settings/audit',
+    label: '操作紀錄',
+    Icon: ScrollText,
+    hint: '每一次異動的前後值，誤刪可照著補回',
+    ready: true,
+  },
   {
     href: '/admin',
     label: '管理中心',
