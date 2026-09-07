@@ -80,6 +80,17 @@ export function positiveInt(max: number, label: string) {
     .refine((v) => v <= max, `${label}最多為 ${max}`)
 }
 
+/** 選填的非負整數（PPM、單價）：空字串代表「沒填」而不是 0 */
+export function optionalNonNegativeInt(max: number, label: string) {
+  return z
+    .string()
+    .trim()
+    .transform((v) => (v === '' ? null : Number(v)))
+    .refine((v) => v === null || Number.isInteger(v), `${label}必須是整數`)
+    .refine((v) => v === null || v >= 0, `${label}不能是負數`)
+    .refine((v) => v === null || v <= max, `${label}最多為 ${max}`)
+}
+
 /**
  * 十六進位色碼。限制成 `#rrggbb` 而不接受簡寫或色彩名稱 ——
  * 這個值會直接送進 ECharts 的 itemStyle 與 inline style，
