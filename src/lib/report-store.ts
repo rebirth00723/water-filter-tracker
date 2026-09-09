@@ -1,6 +1,6 @@
 import 'server-only'
 import { and, asc, eq, gte } from 'drizzle-orm'
-import { addMonths, diffDays, toTs, todayTpe } from './date'
+import { addMonths, diffDays, toTs, currentDate } from './date'
 import { db } from './db'
 import { categories, eventItems, events, items, readings } from './db/schema'
 import { categoryDues, costByCategory, costByYear } from './events-store'
@@ -52,7 +52,7 @@ function rangeStart(range: RangeKey, today: string): string | null {
 }
 
 export function buildReport(deviceId: number, range: RangeKey): ReportData {
-  const today = todayTpe()
+  const today = currentDate()
   const from = rangeStart(range, today)
 
   const readingRows = db

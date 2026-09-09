@@ -2,7 +2,7 @@ import 'server-only'
 import { and, asc, eq, lt, sql } from 'drizzle-orm'
 import { audit } from '../audit'
 import { getPublicUrl } from '../config'
-import { addDays, diffDays, hourTpe, todayTpe } from '../date'
+import { addDays, diffDays, currentHour, currentDate } from '../date'
 import { db } from '../db'
 import { categories, devices, items, notifyLog, notifyRules } from '../db/schema'
 import { devicePath } from '../device-path'
@@ -74,8 +74,8 @@ function clickUrl(deviceId: number): string | undefined {
  */
 export async function sweep(opts: { force?: boolean; now?: Date } = {}): Promise<SweepResult> {
   const now = opts.now ?? new Date()
-  const today = todayTpe(now)
-  const hour = hourTpe(now)
+  const today = currentDate(now)
+  const hour = currentHour(now)
   const result: SweepResult = { scanned: 0, sent: 0, failed: 0, skipped: 0, retried: 0, notes: [] }
 
   if (!ntfyConfigured('filter')) {
@@ -345,7 +345,7 @@ async function retryFailed(result: SweepResult): Promise<number> {
     const device = db.select().from(devices).where(eq(devices.id, cat.deviceId)).get()
     if (!device) continue
 
-    const dues = categoryDues(cat.deviceId, todayTpe())
+    const dues = categoryDues(cat.deviceId, currentDate())
     const due = dues.find((d) => d.categoryId === cat.id)
     if (!due?.due.dueOn) continue
 

@@ -9,7 +9,14 @@ import { cn } from '@/lib/utils'
 
 export interface AuditItem {
   id: number
-  at: number
+  /**
+   * 伺服端依 App 時區格式化好的時間字串。
+   *
+   * 刻意不傳 epoch ms 讓客戶端自己轉 —— 客戶端讀不到 `TZ`，
+   * 轉出來會是瀏覽器的時區，而伺服端渲染的 HTML 用的是 App 時區，
+   * 兩者不一致就是 hydration 錯誤加上錯的時間。
+   */
+  atLabel: string
   username: string | null
   ip: string | null
   userAgent: string | null
@@ -135,7 +142,7 @@ export function AuditList({
                         <span className="text-sm">{it.summary}</span>
                       </span>
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {new Date(it.at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}
+                        {it.atLabel}
                         {it.username && ` · ${it.username}`}
                         {it.ip && it.ip !== 'unknown' && ` · ${it.ip}`}
                         {' · '}

@@ -1,0 +1,18 @@
+version: 2
+updates:
+  # 相依套件的漏洞被無差別掃描是這個專案最可能遭遇的實際風險，
+  # 而不是有人針對它寫 exploit
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # 一週一個 PR 而不是十個 —— 個人專案沒有人力逐個 review
+      all:
+        patterns: ['*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

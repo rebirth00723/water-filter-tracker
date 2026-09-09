@@ -1,5 +1,6 @@
 import 'server-only'
 import { Cron } from 'croner'
+import { APP_TIME_ZONE } from '../date'
 import { log } from '../log'
 import { pruneAuditLog, sweep } from './sweep'
 
@@ -25,7 +26,7 @@ export function startSchedule(): void {
     new Cron(
       '*/15 * * * *',
       // protect：上一輪還沒結束就不疊加。ntfy 逾時 8 秒 × 多個項目可能超過 15 分鐘
-      { name: 'notify-sweep', protect: true, timezone: process.env.APP_TZ ?? 'Asia/Taipei' },
+      { name: 'notify-sweep', protect: true, timezone: APP_TIME_ZONE },
       async () => {
         try {
           const res = await sweep()
@@ -42,7 +43,7 @@ export function startSchedule(): void {
   jobs.push(
     new Cron(
       '17 3 * * *',
-      { name: 'prune-audit', protect: true, timezone: process.env.APP_TZ ?? 'Asia/Taipei' },
+      { name: 'prune-audit', protect: true, timezone: APP_TIME_ZONE },
       () => {
         try {
           const n = pruneAuditLog()

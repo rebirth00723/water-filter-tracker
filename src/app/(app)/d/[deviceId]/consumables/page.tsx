@@ -1,11 +1,11 @@
 import { EventList } from '@/components/consumables/EventList'
 import { DeviceHeader } from '@/components/nav/DeviceHeader'
-import { todayTpe } from '@/lib/date'
+import { currentDate } from '@/lib/date'
 import { buildPickerCategories, listEvents, recentTemplates } from '@/lib/events-store'
 
 export default async function ConsumablesPage({ params }: PageProps<'/d/[deviceId]/consumables'>) {
   const id = Number((await params).deviceId)
-  const today = todayTpe()
+  const today = currentDate()
 
   return (
     <>

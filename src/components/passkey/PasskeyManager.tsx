@@ -16,13 +16,13 @@ import { ConfirmButton } from '@/components/forms/ConfirmButton'
 import { Badge, Button, Card, EmptyState, Field, Input, buttonClass } from '@/components/ui'
 import { Drawer } from '@/components/ui/Drawer'
 import { withBasePath } from '@/lib/base-path'
-import { fmtZh } from '@/lib/date'
 
 export interface PasskeyRow {
   id: number
   deviceLabel: string | null
-  createdAt: number
-  lastUsedAt: number | null
+  /** 伺服端依 App 時區格式化好的字串 —— 客戶端自己轉會差一天，見 lib/date.ts */
+  createdLabel: string
+  lastUsedLabel: string | null
   transports: string[]
 }
 
@@ -164,10 +164,8 @@ export function PasskeyManager({ state }: { state: PasskeyState }) {
                     {r.transports.includes('hybrid') && <Badge tone="muted">跨裝置</Badge>}
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {fmtZh(new Date(r.createdAt).toISOString().slice(0, 10))} 註冊
-                    {r.lastUsedAt
-                      ? ` · 上次使用 ${fmtZh(new Date(r.lastUsedAt).toISOString().slice(0, 10))}`
-                      : ' · 還沒用過'}
+                    {r.createdLabel} 註冊
+                    {r.lastUsedLabel ? ` · 上次使用 ${r.lastUsedLabel}` : ' · 還沒用過'}
                   </p>
                 </div>
                 <Button

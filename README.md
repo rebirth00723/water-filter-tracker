@@ -1,124 +1,331 @@
-# 淨水器耗材與水質記錄系統
+# Water Filter Tracker
 
-自架、手機優先的單人記錄系統：記錄耗材新購／更換與成本、記錄原水與純水 PPM、
-把兩者疊在同一條時間軸上判斷濾心衰退，並在接近更換日時透過 **ntfy** 主動推播。
+Self-hosted, mobile-first tracker for RO water purifier consumables and water quality.
 
-- 前端與後端：Next.js 16（App Router）+ TypeScript
-- 資料：SQLite（Drizzle ORM + better-sqlite3），WAL 模式
-- 圖表：ECharts 6
-- 部署：Docker Compose，`cloudflared → Caddy → app`
-- 時區：Asia/Taipei（日期一律存 `YYYY-MM-DD` 字串）
+Records filter purchases and replacements with cost, logs raw and pure TDS (ppm) readings,
+overlays both on a shared timeline so filter degradation becomes visible, and pushes a
+reminder through [ntfy](https://ntfy.sh) as a replacement date approaches.
 
-## 開發
+[繁體中文說明](./README.zh-TW.md)
+
+---
+
+## Why this exists
+
+Filter replacement dates live in your head, so you forget them. And because raw water
+quality shifts with the season, the pure-water number alone doesn't tell you whether the
+membrane is degrading — 12 ppm in summer and 18 ppm in winter can be the same healthy
+filter. What you actually need is the rejection rate over time, with replacement events
+marked on the same axis.
+
+That's the whole app: two numbers, a list of what you changed, and a chart that puts them
+together.
+
+## Features
+
+**Consumables** — Log a replacement in about 30 seconds while standing at the sink.
+Template chips fill the whole list from your last replacement; a two-stage picker shows
+each filter stage with its stock and overdue days, so the picker doubles as a to-do list.
+Purchases track cost and vendor.
+
+**Water quality** — Raw and pure ppm with a live rejection-rate readout. Readings entered
+during a replacement are owned by that event: edit the event's date and the chart point
+moves with it.
+
+**Report** — A ppm line chart with a replacement swimlane below it, sharing one time axis.
+Tap anywhere to snap to the nearest date and see both the readings and everything replaced
+that day. Pinch to zoom five years of data on a phone.
+
+**Reminders** — Per-rule advance notices (14 days, 3 days, day-of) and repeating overdue
+notices, each with its own send time, message template, and priority. Filter reminders and
+security events go to two separate ntfy topics so the latter isn't buried by the former.
+
+**Multiple devices** — Each purifier gets its own URL (`/d/1`, `/d/2`) and its own
+downloadable QR code with the device name burned into the image. Stick one on each machine.
+
+**Login** — Password always; [passkey](#passkeys) as an optional shortcut where HTTPS is
+available. Data lives in a single SQLite file you can export as JSON and import elsewhere.
+
+## Quick start
+
+```bash
+mkdir water-filter-tracker && cd water-filter-tracker
+curl -O https://raw.githubusercontent.com/rebirth00723/water-filter-tracker/main/compose.yaml
+docker compose up -d
+```
+
+Then open `http://<host>:8085` and set a username and password. That's the whole setup —
+no token, no CLI step, no config file to edit first.
+
+> [!IMPORTANT]
+> **Finish that first-run setup before exposing the service to the internet.** The setup
+> page is deliberately unprotected — whoever reaches it first claims the account. If the
+> service is only on your LAN this doesn't matter; if it's behind a tunnel, set the password
+> before you point a public hostname at it.
+
+Everything else — the outward URL, ntfy connection, notification rules — is configured in
+the web UI. There are **no required environment variables**.
+
+## Two ways to run it
+
+### (a) LAN only
+
+No domain, no certificate, no reverse proxy. Publish the port and you're done:
+
+```yaml
+services:
+  app:
+    image: ghcr.io/rebirth00723/water-filter-tracker:latest
+    ports: ['8085:8085']
+    volumes: ['./data:/data']
+```
+
+Everything works — recording, reports, reminders, QR codes (fill in
+`http://192.168.x.x:8085` as the outward URL in Admin). The only feature you can't use is
+passkeys, because browsers don't expose WebAuthn over plain HTTP. Password login works
+fine.
+
+### (b) Remote access
+
+You need HTTPS with a real domain name. Point a tunnel or reverse proxy at the container
+and set the outward URL in Admin (or via `PUBLIC_URL`).
+
+**The HTTPS requirement is the browser's, not this project's.** WebAuthn does not exist in
+non-secure contexts, and a WebAuthn Relying Party ID must be a domain name — IP addresses
+are invalid per spec. If you want passkeys, you need a certificate. Ways to get one without
+buying anything:
+
+| Situation | Approach |
+|---|---|
+| You use Tailscale | `tailscale cert <host>.<tailnet>.ts.net` — free, auto-renewing |
+| You have a public domain | Cloudflare Tunnel, or Caddy/Traefik with Let's Encrypt |
+| Internal-only domain | Let's Encrypt via DNS-01 (no inbound port needed) |
+| No domain at all | [mkcert](https://github.com/FiloSottile/mkcert) internal CA — you must install the root cert on each device |
+
+**Keep the LAN port published as well.** Password login works over plain HTTP, so if the
+tunnel goes down you can still reach the app and record a replacement. That's the practical
+payoff of making password the floor rather than passkey-only.
+
+If you use a reverse proxy, **do not rewrite the `Host` header** — Next.js compares
+`Origin` against `Host` to block cross-site writes, and rewriting Host makes that check
+fail. (In Cloudflare Tunnel, this is the `httpHostHeader` option; leave it unset.)
+
+## QR codes
+
+Settings → Devices → pick a device → **Download PNG**.
+
+The image contains the QR plus the device name and URL. Print one, stick it on the machine,
+and scanning it opens that specific purifier's page — no URL to remember, no device to
+switch, no app to install. With three purifiers this is the difference between the tool
+getting used and not.
+
+The URL is composed on the server from your configured outward URL, never derived from
+`window.location`. That's deliberate: if you open Settings from a LAN IP, a
+browser-derived QR would encode an address that fails from outside.
+
+## Notifications
+
+Point it at any ntfy server (self-hosted or ntfy.sh) in Admin. Leave it blank and
+notifications are simply off; everything else still works.
+
+Two topics, one credential:
+
+- **Filter reminders** — "the first stage is due in 14 days"
+- **Security events** — a passkey was registered or revoked
+
+They're separate because a filter reminder every few weeks would bury the one message you
+need to see immediately.
+
+### Is the topic name a secret?
+
+**It depends on your ntfy server, and the advice is opposite in the two cases:**
+
+| Server config | Topic = password? | What to do |
+|---|---|---|
+| `ntfy.sh`, or self-hosted with `auth-default-access: read-write` | **Yes.** Anyone who knows the topic can subscribe and publish. | Add a long random suffix: `water-filter-a8f3d91c` |
+| Self-hosted with `auth-default-access: deny-all` | **No.** The name is useless without a token or account authorized for it. | Use a readable name |
+
+Prefer an access token over a username/password: a leaked token can be revoked on its own,
+whereas a leaked password means changing the whole ntfy account.
+
+Credentials are stored in the database **in plaintext**. The only key available to encrypt
+them sits in the same directory as the database, so anyone who can read one can read the
+other — encrypting would be theatre. They're excluded from JSON export for the same reason
+they'd otherwise leak.
+
+## Configuration
+
+Every setting has a UI equivalent. Environment variables exist for people who prefer
+declarative config, and **they take precedence** — a field controlled by an env var shows
+up read-only in Admin, labelled as such, rather than letting you edit a value that won't
+take effect.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `PUBLIC_URL` | UI | Outward URL. **Required for passkeys, and must be HTTPS with a domain name.** Also used for QR codes and notification click-through. Changing it invalidates every existing passkey |
+| `PORT` | `8085` | The only outward port |
+| `BASE_PATH` | — | Mount the whole app under a sub-path (e.g. `/water`) when the path collides on a shared domain. `PUBLIC_URL` must include the same prefix |
+| `TEMP_PASSWORD` | — | Rescue password. **Leaving it set is a permanent backdoor** — see [Security](#security) |
+| `DATABASE_PATH` | `/data/app.sqlite3` | |
+| `SESSION_SECRET` | auto | Generated at `/data/session.key` (mode 0600) on first start. Set it only if you want to manage it yourself |
+| `SESSION_MAX_AGE_DAYS` | `30` | |
+| `COOKIE_SECURE` | `auto` | `auto` follows `X-Forwarded-Proto`. A `Secure` cookie is silently dropped over plain HTTP, which looks like "login succeeds then immediately fails" |
+| `NTFY_URL` | UI | Base URL only, **no topic** — this app posts to ntfy's JSON endpoint at the root path |
+| `NTFY_TOPIC_FILTER` / `NTFY_TOPIC_SECURITY` | UI | |
+| `NTFY_TOKEN` | UI | Or `NTFY_USER` + `NTFY_PASSWORD`. Token wins if both are set |
+| `TZ` | system, `Asia/Taipei` in the image | IANA name. Affects what counts as "today", due-date maths, and notification send times. A typo falls back to the system zone and logs a line rather than refusing to start |
+| `SESSION_KEY_PATH` | next to the database | Where the auto-generated session key lives |
+| `REAL_IP_HEADER` | auto | Names a single header for the visitor IP. **Only affects log accuracy** — authorization never looks at IPs or headers |
+| `LOG_LEVEL` | `info` | |
+
+Any variable also accepts a `_FILE` suffix pointing at a file (for Docker secrets):
+`NTFY_PASSWORD_FILE=/run/secrets/ntfy`.
+
+Running as a non-root user? The image doesn't hardcode `USER`, because every host has a
+different uid (1000 on most Linux, 1026 on some NAS boxes, different again in LXC).
+Set Docker's own field instead:
+
+```yaml
+user: "1000:1000"   # your `id -u`:`id -g`
+```
+
+## Data and backups
+
+Everything is one file: `./data/app.sqlite3`.
+
+There is **no built-in backup feature** — snapshots, rsync and Restic are more reliable
+than anything the app could do, and you probably already run one of them.
+
+> [!WARNING]
+> **Do not copy `app.sqlite3` while the container is running.** WAL mode keeps recent
+> transactions in the `-wal` sidecar, so the copy can be missing data. Either stop the
+> container first, or use `sqlite3 app.sqlite3 ".backup out.sqlite3"`.
+
+Also: **never put the database on NFS or SMB.** SQLite's file locking is unreliable there
+and will silently corrupt data.
+
+For moving to another machine, Settings → Export/Import produces a single human-readable
+JSON file. It deliberately excludes credentials, passkeys, the audit log and the ntfy
+connection: passkeys are bound to a domain and would be useless anyway, an importable
+credentials file would be a backdoor, and an audit log from another machine isn't evidence
+of anything.
+
+## Security
+
+What this project does:
+
+- Password login with scrypt hashing, per-password salt, constant-time comparison
+- Rate limiting keyed on the account (2 per 30s, 4 failures → 10 minute lock)
+- Every login failure returns an identical response — same status, message, URL, and
+  timing — so the response can't be used to probe for a valid username
+- Session tokens signed with a per-deployment key generated on first start
+- Content Security Policy with a per-request nonce, `frame-ancestors 'none'`,
+  `Referrer-Policy`, `X-Content-Type-Options`
+- `Origin`/`Host` comparison on every write (Next.js Server Actions do this natively)
+- Audit log of every login and data change, with before/after values
+
+What it deliberately does not do, and why:
+
+- **No HSTS.** A long `max-age` is irreversible and would lock out anyone self-hosting over
+  plain HTTP on their LAN.
+- **The first-run setup page is unprotected.** Whether the service faces the internet is the
+  operator's decision; accidental exposure before setup is explicitly out of scope. Finish
+  setup before exposing it.
+- **No vendor-specific auth** (e.g. Cloudflare Access). Tying an open-source project to one
+  provider defeats the point.
+
+Things worth knowing:
+
+- **`TEMP_PASSWORD` left in your config is a permanent backdoor.** It exists so that
+  changing your password and then forgetting it doesn't lock you out. Logging in with it
+  forces a password change immediately, and the login page keeps warning you on *every*
+  login for as long as it's set. Remove it and restart when you're done.
+- **Passkeys are bound to the domain.** Change `PUBLIC_URL` and every registered passkey
+  stops working; you re-register from the same page.
+- **Passkeys can't be used over plain HTTP.** That's the browser, not this app. Password
+  login always works, which is why it's the floor rather than an afterthought.
+- Regenerating the session key in Admin logs out every device. **Passkeys are unaffected**
+  and don't need re-registering.
+
+### Passkeys
+
+Password first, passkey as an upgrade — never passkey-only. A passkey is bound to a device
+and a domain, so a lost phone, a domain change, or a plain-HTTP fallback all leave you with
+the password as the only way in.
+
+Registration involves **no QR code and no one-time token**: log in with your password, open
+Settings → Quick login, tap once, use Face ID. Being logged in with a password *is* the
+authorization. The server stores only public keys, so a database leak can't be used to log
+in.
+
+Enable it globally in Admin (which requires HTTPS with a domain, and a password already
+set), then register each device from Settings → Quick login. Admin also holds the full
+credential list with emergency revoke, for when a phone goes missing.
+
+## Development
 
 ```bash
 npm install
-cp .env.example .env      # 至少填 SESSION_SECRET 與 APP_USERS
-npm run dev
+npm run dev              # http://localhost:3000
 ```
 
-資料庫的 migration 與種子資料會在伺服器啟動時自動執行（`src/instrumentation.ts`），
-不需要手動跑任何指令。改了 `src/lib/db/schema.ts` 之後：
+Migrations and seed data run automatically at server start
+(`src/instrumentation.ts` → `src/lib/boot.ts`). After changing `src/lib/db/schema.ts`:
 
 ```bash
-npm run db:generate       # 產生新的 migration SQL 到 drizzle/
+npm run db:generate      # writes a new migration to drizzle/
 ```
 
 ```bash
-npm test                  # 單元測試
-npm run typecheck
+npm test                 # vitest
+npm run typecheck        # these are separate on purpose — vitest uses esbuild
+npm run build            # and does NOT typecheck
 ```
 
-## 部署
+### Layout
 
-```bash
-mkdir -p backup secrets && chmod 700 secrets
-# 依 secrets/README.md 建立各項機密
-docker compose up -d --build
+```
+src/
+  app/
+    (app)/               authenticated shell
+      d/[deviceId]/      per-device: home, consumables, water, report
+      settings/          devices, notifications, data, quick login, audit
+      admin/             outward URL, ntfy, session key, passkey toggle
+    api/                 auth, passkey, export, import, health
+    setup|login|change-password/
+  lib/
+    db/                  Drizzle schema, migrations, seed
+    auth/                password, session, rate limit, passkey
+    notify/              ntfy client, sweep, croner schedule
+    schemas/             zod — shared by client forms and server actions
+  components/
 ```
 
-`app` 容器**刻意不對外發布任何連接埠**，唯一入口是 Caddy，而 Caddy 只綁在
-`127.0.0.1:8080`。主機上的 cloudflared 連得到、區網上的任何人都連不到 ——
-這是 `CF-Connecting-IP` 可信的前提：只要還有別的路徑能連到 app，
-那條路徑上的人就能偽造這個 header。
+### Conventions worth knowing before you change things
 
-cloudflared 的 ingress 指向 `http://localhost:8080` 即可。
-**不要設 `httpHostHeader`**，那會讓 Next.js 的 Server Action origin 檢查失敗。
+- **User-visible dates are `TEXT` in `YYYY-MM-DD`, never DateTime.** These are calendar
+  dates, not instants. Lexicographic order equals chronological order (so `MAX()`,
+  `ORDER BY` and `BETWEEN` work directly), they cross the server/client boundary without
+  serialization, and there's no timezone off-by-one waiting to happen.
+- **Pages are Server Components that query SQLite directly.** There is no read API layer;
+  that's the biggest simplification this stack allows. Client Components are leaves.
+- **Writes go through Server Actions**, and every one re-checks authorization — a Server
+  Action is a public HTTP endpoint, so the page that rendered the form is not a boundary.
+- **One zod schema per shape, shared** by react-hook-form and the Server Action. Client and
+  server validation cannot drift.
+- **`foreign_keys = ON`** is set per connection. SQLite defaults it off, and without it
+  every cascade and restrict in the schema is decorative.
+- Modules that touch the database import `'server-only'`. Anything a Client Component needs
+  lives in a separate pure module (`device-path.ts`, `ppm.ts`, `audit-groups.ts`).
 
-### Cloudflare 那邊要做什麼
+## Contributing
 
-`CF-Connecting-IP` 是 Cloudflare 邊緣自動附加的，**不需要任何設定**。只有兩件事要確認：
+Issues and pull requests are welcome. Bug reports are most useful with the failing input
+and what you expected instead.
 
-- **不要開啟 Pseudo IPv4** —— 會把該 header 換成合成的假 IPv4。
-- 若設過 Transform Rules，確認沒有移除 `CF-Connecting-IP`。
+If you're changing behaviour, please include a test. `npm test && npm run typecheck` should
+both pass — they check different things.
 
-**強烈建議加開 Cloudflare Access（Zero Trust，個人用免費）**：開了之後陌生人
-連登入頁都看不到，本系統的 TOTP 就降級成第二道防線 —— 那才是它該待的位置。
-在 `docker-compose.yml` 填入 `CF_ACCESS_TEAM_DOMAIN` 與 `CF_ACCESS_AUD` 之後，
-app 會用 Cloudflare 的公鑰驗證 `Cf-Access-Jwt-Assertion`，
-因此即使 tunnel 設定外流、有人直接打到 origin 也過不了。
+## License
 
-## 登入
-
-帳號 + 6 碼 TOTP，同一個畫面一起送出（兩段式流程會洩漏哪些帳號存在）。
-
-```bash
-npm run auth:new-user -- rose     # 產生 secret 並在終端機印出可掃描的 QR Code
-```
-
-> **設定當下請務必做兩件事**：把 secret 存進密碼管理器，並用**兩個裝置**掃同一個
-> QR Code（手機 + 1Password/Bitwarden）。只有一個地方有 secret 的話，
-> 手機掉了就只能 SSH 回家改設定。
-
-### 防爆破規則
-
-- 30 秒內最多 2 次；累計 4 次失敗鎖該帳號 10 分鐘；成功登入即歸零。
-- **只鎖帳號，不看 IP。** 防枚舉靠的是「所有失敗回應完全一致 + 固定回應時間下限」，
-  而不是 IP 限流；不存在的帳號完全不建立計數器，因此也灌不爆記憶體。
-- 不論帳號不存在、驗證碼錯誤或處於鎖定中，一律回同一句錯誤訊息、同樣的回應時間。
-  真正的原因寫在容器 log 與「設定 → 操作紀錄」裡。
-- 鎖定觸發、以及**新裝置登入成功**時，都會推播 ntfy。
-  （失敗通知是雜訊，自己打錯也會觸發；成功通知才是訊號。）
-
-### 被鎖住了怎麼辦
-
-計數器只存在記憶體，**重啟容器即全部解鎖**：
-
-```bash
-docker compose restart app
-```
-
-這是刻意保留的自救後門。人不在家時改用 `RECOVERY_CODE`：
-附上它可略過鎖定計數，但**仍然必須通過 TOTP**（繞過的是鎖，不是驗證），
-且每次使用都會寫入操作紀錄並推播 ntfy。
-
-另外，鎖定只作用在登入端點 —— **已經登入的裝置完全不受影響**，
-別人怎麼鎖都影響不到你手上那支已登入的手機。
-
-## 備份
-
-- 每日 03:00 以 SQLite 的 `VACUUM INTO` 產生乾淨快照到 `./backup/`，保留 14 份。
-  （WAL 模式下不能只複製 `.sqlite3` 檔，最近的交易還在 `-wal` 裡。）
-- `/api/export` 提供 JSON 匯出。對個人應用來說，一份人類可讀、與 schema 版本
-  解耦的 JSON 比二進位快照更保險 —— 三年後想搬到別的工具時它還讀得懂。
-
-## 疑難排解
-
-**登入一直說驗證碼錯誤** —— TOTP 完全依賴時鐘。先看容器啟動時印的 `hostTime`：
-
-```bash
-docker compose logs app | grep 啟動完成
-```
-
-主機時間漂掉超過容差就會全部驗不過，而症狀看起來就像「密碼錯了」。確認 NTP 有在跑。
-
-**看訪問紀錄與操作紀錄**
-
-```bash
-docker compose logs -f caddy    # 訪問紀錄（JSON，含真實訪客 IP）
-docker compose logs -f app      # 應用日誌（JSON）
-docker compose logs app | grep login
-```
-
-業務層的操作紀錄（誰在何時把哪一筆改成什麼，含變更前後值）在
-「設定 → 操作紀錄」頁，保留天數可調。
+[MIT](./LICENSE)

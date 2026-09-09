@@ -1,7 +1,7 @@
 import { StatusCards } from '@/components/home/StatusCards'
 import { DeviceHeader } from '@/components/nav/DeviceHeader'
 import { Card } from '@/components/ui'
-import { todayTpe } from '@/lib/date'
+import { currentDate } from '@/lib/date'
 import { getDevice } from '@/lib/devices'
 import { categoryDues } from '@/lib/events-store'
 import { latestReading } from '@/lib/readings-store'
@@ -22,7 +22,7 @@ export default async function DeviceHome({ params }: PageProps<'/d/[deviceId]'>)
         )}
         <StatusCards
           deviceId={id}
-          dues={categoryDues(id, todayTpe())}
+          dues={categoryDues(id, currentDate())}
           latest={latestReading(id)}
         />
       </div>

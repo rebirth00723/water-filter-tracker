@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/PageHeader'
 import { AuditList, type AuditItem } from '@/components/settings/AuditList'
 import { AUDIT_GROUPS, groupOf, type AuditGroup } from '@/lib/audit-groups'
+import { fmtDateTime } from '@/lib/date'
 import { listAudit } from '@/lib/audit-store'
 import { SETTING_KEYS, getSetting } from '@/lib/settings'
 
@@ -33,7 +34,7 @@ export default async function AuditPage({ searchParams }: PageProps<'/settings/a
 
   const items: AuditItem[] = rows.map((r) => ({
     id: r.id,
-    at: r.at,
+    atLabel: fmtDateTime(r.at),
     username: r.username,
     ip: r.ip,
     userAgent: r.userAgent,

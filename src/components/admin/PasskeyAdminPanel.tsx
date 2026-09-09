@@ -12,13 +12,13 @@ import {
 import { actionErrorMessage } from '@/components/forms/action-feedback'
 import { ConfirmButton } from '@/components/forms/ConfirmButton'
 import { Badge, Button, Card, CheckboxRow, buttonClass } from '@/components/ui'
-import { fmtZh } from '@/lib/date'
 
 export interface AdminCredential {
   id: number
   deviceLabel: string | null
-  createdAt: number
-  lastUsedAt: number | null
+  /** 伺服端依 App 時區格式化好的字串 —— 客戶端自己轉會差一天，見 lib/date.ts */
+  createdLabel: string
+  lastUsedLabel: string | null
 }
 
 /**
@@ -110,10 +110,8 @@ export function PasskeyAdminPanel({
                         {c.deviceLabel ?? '未命名裝置'}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {fmtZh(new Date(c.createdAt).toISOString().slice(0, 10))} 註冊
-                        {c.lastUsedAt
-                          ? ` · 上次使用 ${fmtZh(new Date(c.lastUsedAt).toISOString().slice(0, 10))}`
-                          : ' · 還沒用過'}
+                        {c.createdLabel} 註冊
+                        {c.lastUsedLabel ? ` · 上次使用 ${c.lastUsedLabel}` : ' · 還沒用過'}
                       </span>
                     </span>
                     <ConfirmButton

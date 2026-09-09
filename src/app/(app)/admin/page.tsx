@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { AdminPanels, type AdminState } from '@/components/admin/AdminPanels'
 import { listCredentials } from '@/lib/auth/passkey'
 import { requireAdmin } from '@/lib/auth/require'
+import { fmtDateOnly } from '@/lib/date'
 import {
   CONFIG_KEYS,
   getConfig,
@@ -63,8 +64,8 @@ export default async function AdminPage() {
     credentials: listCredentials(user.username).map((c) => ({
       id: c.id,
       deviceLabel: c.deviceLabel,
-      createdAt: c.createdAt,
-      lastUsedAt: c.lastUsedAt,
+      createdLabel: fmtDateOnly(c.createdAt),
+      lastUsedLabel: c.lastUsedAt === null ? null : fmtDateOnly(c.lastUsedAt),
     })),
   }
 

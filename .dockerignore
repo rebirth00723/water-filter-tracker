@@ -1,13 +1,25 @@
+# 建置產物與相依：builder 階段會自己 npm ci 與 build
 node_modules
 .next
+out
+
+# 版本控制與開發用檔案
 .git
+.github
+*.md
+!README.md
+
+# 機密與資料：絕不進映像
 .env
 .env.*
 !.env.example
-data
-backup
-secrets
-caddy-data
-caddy-config
-*.sqlite3*
-README.md
+/data
+/secrets
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+session.key
+
+# 本機測試殘留
+coverage
+*.tsbuildinfo

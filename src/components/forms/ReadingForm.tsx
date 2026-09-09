@@ -37,7 +37,7 @@ export function ReadingForm({
   deviceId: number
   /** 有值＝編輯模式。`reading.eventId !== null` 時日期鎖定 */
   reading?: Reading
-  /** 由伺服器算好的今天（Asia/Taipei）。不用瀏覽器的時區推導，出國時才不會差一天 */
+  /** 由伺服器依 App 時區算好的今天。不用瀏覽器推導 —— 出國或設了 TZ 時才不會差一天 */
   today: string
   onDone?: () => void
   onCancel?: () => void

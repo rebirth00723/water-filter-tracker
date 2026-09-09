@@ -1,0 +1,21 @@
+name: Prune untagged images
+
+on:
+  schedule:
+    - cron: '23 4 * * 0'
+  workflow_dispatch:
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      # 每次 push 都會產生一個 sha- 標籤的映像，被 latest 取代後就成為孤兒。
+      # 不清理的話 GHCR 會無限累積
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: water-filter-tracker
+          package-type: container
+          min-versions-to-keep: 10
+          delete-only-untagged-versions: true

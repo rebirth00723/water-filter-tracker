@@ -1,7 +1,7 @@
 import { audit } from '@/lib/audit'
 import { clientIp, userAgent } from '@/lib/auth/client-ip'
 import { requireUser } from '@/lib/auth/require'
-import { todayTpe } from '@/lib/date'
+import { currentDate } from '@/lib/date'
 import { exportAll } from '@/lib/transfer'
 
 export const dynamic = 'force-dynamic'
@@ -28,7 +28,7 @@ export async function GET() {
       `${data.readings.length} 筆水質紀錄`,
   })
 
-  const filename = `water-filter-tracker-${todayTpe()}.json`
+  const filename = `water-filter-tracker-${currentDate()}.json`
   return new Response(JSON.stringify(data, null, 2), {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',

@@ -1,3 +1,4 @@
+import { APP_TIME_ZONE } from './date'
 import { runMigrations } from './db/migrate'
 import { seedIfEmpty } from './db/seed'
 import { log } from './log'
@@ -27,8 +28,8 @@ export function boot() {
     log.info('啟動完成', {
       ms: Date.now() - started,
       hostTime: new Date().toISOString(),
-      tz: process.env.TZ ?? '(未設定)',
-      appTz: process.env.APP_TZ ?? 'Asia/Taipei',
+      tz: process.env.TZ ?? '(未設定，使用系統時區)',
+      resolvedTimeZone: APP_TIME_ZONE,
       node: process.version,
       db: process.env.DATABASE_PATH ?? './data/app.sqlite3',
     })
