@@ -89,7 +89,11 @@ function OpenModeNotice() {
 function PublicUrlPanel({ state }: { state: AdminState }) {
   const [value, setValue] = useState(state.publicUrl ?? '')
   const save = useAction(savePublicUrl, {
-    onSuccess: () => toast.success('已儲存對外網址'),
+    onSuccess: ({ data }) => {
+      // 有自動修正的話要說出來，否則使用者不會知道存進去的與他打的不一樣
+      toast.success(`已儲存對外網址${data.note}`, { duration: data.note ? 10_000 : 4000 })
+      setValue(data.publicUrl ?? '')
+    },
     onError: ({ error }) => toast.error(actionErrorMessage(error)),
   })
 

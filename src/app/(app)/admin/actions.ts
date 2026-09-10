@@ -18,6 +18,7 @@ import {
   setPasskeyEnabled,
 } from '@/lib/config'
 import { deleteAllCredentials, deleteCredential } from '@/lib/auth/passkey'
+import { BASE_PATH } from '@/lib/base-path'
 import { manualSweep } from '@/lib/notify/sweep'
 import { NtfyError, sendNtfy, sendNtfyQuiet } from '@/lib/notify/ntfy'
 import { ActionError, actionClient } from '@/lib/safe-action'
@@ -55,6 +56,9 @@ export const savePublicUrl = adminAction
     if (isEnvControlled(CONFIG_KEYS.publicUrl)) {
       throw new ActionError('對外網址由環境變數 PUBLIC_URL 控制，無法從介面修改')
     }
+    let normalized = publicUrl
+    let note = ''
+
     if (publicUrl) {
       let parsed: URL
       try {
@@ -65,10 +69,33 @@ export const savePublicUrl = adminAction
       if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
         throw new ActionError('只接受 http 或 https')
       }
+      if (parsed.search || parsed.hash) {
+        throw new ActionError('網址不能帶查詢字串或錨點')
+      }
+
+      /*
+       * 路徑要正規化掉。
+       *
+       * 使用者幾乎一定是從瀏覽器網址列複製的，於是會帶著當下那一頁的路徑 ——
+       * 實際發生過：存進去的是 `https://…/admin`。
+       * passkey 不受影響（RP ID 只看 hostname），所以問題不會立刻浮現，
+       * 但 QR Code 會變成 `https://…/admin/d/1`、通知的點擊連結也一樣 ——
+       * 兩者都是 404，而使用者要等到拿手機掃那張貼在機器上的標籤時才發現。
+       *
+       * 掛在子路徑下時（BASE_PATH）那個前綴是必要的，所以保留它、只砍其餘。
+       */
+      const wanted = BASE_PATH || ''
+      const path = parsed.pathname.replace(/\/+$/, '')
+      if (path !== wanted) {
+        normalized = `${parsed.origin}${wanted}`
+        note = `（已自動去掉網址裡的路徑「${parsed.pathname}」—— 這裡要填的是站台根位址）`
+      } else {
+        normalized = `${parsed.origin}${wanted}`
+      }
     }
 
     const before = getPublicUrl()
-    setConfig(CONFIG_KEYS.publicUrl, publicUrl)
+    setConfig(CONFIG_KEYS.publicUrl, normalized)
 
     /*
      * 改網址會讓所有既有的 passkey 失效（RP ID 綁網域），
@@ -77,10 +104,12 @@ export const savePublicUrl = adminAction
      */
     ctx.note({
       action: 'admin.publicUrl',
-      summary: `對外網址由「${before ?? '(未設定)'}」改為「${publicUrl ?? '(未設定)'}」。既有的 passkey 會全部失效`,
+      summary:
+        `對外網址由「${before ?? '(未設定)'}」改為「${normalized ?? '(未設定)'}」。` +
+        `既有的 passkey 會全部失效${note}`,
     })
     refresh()
-    return { publicUrl }
+    return { publicUrl: normalized, note }
   })
 
 // ─────────────────────────── ntfy ───────────────────────────

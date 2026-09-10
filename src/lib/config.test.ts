@@ -99,3 +99,39 @@ describe('環境變數的覆寫真的接上了', () => {
     expect(config.getPublicUrl()).toBe('https://water.example.com')
   })
 })
+
+describe('對外網址的路徑必須被正規化掉', () => {
+  /*
+   * 這是實際發生過的：使用者從瀏覽器網址列複製，於是存進去的是
+   * `https://water.example.com/admin`。
+   *
+   * passkey 不受影響（RP ID 只看 hostname），所以問題不會立刻浮現 ——
+   * 但 QR Code 會變成 `https://water.example.com/admin/d/1`、
+   * 通知的點擊連結也一樣，兩者都是 404。
+   * 而使用者要等到拿手機掃那張貼在機器上的標籤時才會發現。
+   *
+   * savePublicUrl 這個 action 難以在單元測試裡直接呼叫（需要 requireAdmin
+   * 與請求脈絡），所以這裡驗的是 getPublicUrl 對已存值的處理，
+   * 以及正規化本身的規則。
+   */
+  it('getPublicUrl 去掉尾端斜線但不會自己砍路徑 —— 所以寫入時就得擋', () => {
+    config.setConfig(config.CONFIG_KEYS.publicUrl, 'https://water.example.com/admin')
+    expect(config.getPublicUrl()).toBe('https://water.example.com/admin')
+    // ↑ 這正是問題：讀取端不會救你，所以寫入端必須正規化
+  })
+
+  it('正規化的規則：origin + BASE_PATH，其餘路徑丟掉', () => {
+    const normalize = (raw: string, basePath = '') => {
+      const u = new URL(raw)
+      return `${u.origin}${basePath}`
+    }
+    expect(normalize('https://water.example.com/admin')).toBe('https://water.example.com')
+    expect(normalize('https://water.example.com/')).toBe('https://water.example.com')
+    expect(normalize('https://water.example.com/d/1/report')).toBe('https://water.example.com')
+    expect(normalize('https://water.example.com:8443/admin')).toBe('https://water.example.com:8443')
+    // 掛在子路徑下時那個前綴是必要的，要保留
+    expect(normalize('https://shared.example.com/water/admin', '/water')).toBe(
+      'https://shared.example.com/water',
+    )
+  })
+})
