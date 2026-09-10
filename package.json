@@ -8,9 +8,10 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "typegen": "next typegen"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -49,5 +50,5 @@
     "typescript": "^5",
     "vitest": "^5.0.0"
   },
-  "description": "淨水器耗材更換與水質記錄"
+  "description": "\u6de8\u6c34\u5668\u8017\u6750\u66f4\u63db\u8207\u6c34\u8cea\u8a18\u9304"
 }
