@@ -134,3 +134,20 @@ describe('沒有到期日', () => {
     expect(planFor(rule({ kind: 'OVERDUE', repeatDays: 7 }), noDue, '2026-09-07', 14)).toBeNull()
   })
 })
+
+describe('審查發現的回歸測試', () => {
+  it('planFor 回傳的 days 會被存下來，重試時不重算', () => {
+    /*
+     * 重試若重算 days，用的是「現在的到期狀態」——
+     * 而那在使用者換了濾心或改了週期之後就變了，
+     * 於是重試會送出一則數字完全對不上的訊息：
+     * 「還有 14 天」變成「還有 87 天」，或者反過來。
+     *
+     * 這裡驗的是 plan 本身帶著 days（sweep 會把它寫進 notify_log.plannedDays，
+     * retryFailed 再原樣取用）。
+     */
+    const p = planFor(rule(), dueAt('2026-09-21', '2026-09-07'), '2026-09-07', 14)
+    expect(p).toMatchObject({ kind: 'send', days: 14 })
+    expect(typeof (p as { days: number }).days).toBe('number')
+  })
+})

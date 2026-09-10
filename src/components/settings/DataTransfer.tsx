@@ -1,6 +1,7 @@
 'use client'
 
 import { Download, Upload } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button, Card, CheckboxRow, Field } from '@/components/ui'
@@ -21,6 +22,7 @@ export function DataTransfer() {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<string[] | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const router = useRouter()
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -53,6 +55,15 @@ export function DataTransfer() {
       ])
       setUnderstood(false)
       if (fileRef.current) fileRef.current.value = ''
+      /*
+       * 匯入改寫的是伺服端的資料，而這是一次 fetch（不是 Server Action），
+       * 所以什麼都不會自動失效。
+       *
+       * 取代模式尤其明顯：舊設備全部被刪掉，但共用 layout 裡的
+       * fallbackDeviceId 還是那個已經不存在的 id ——
+       * 使用者按下導覽列的任何一個分頁都會得到 404。
+       */
+      router.refresh()
     } catch (err) {
       toast.error(`匯入失敗：${(err as Error).message}`)
     } finally {

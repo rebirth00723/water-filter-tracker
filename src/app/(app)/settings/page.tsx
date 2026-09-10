@@ -1,6 +1,7 @@
 import { Bell, ChevronRight, Database, KeyRound, ScrollText, Server, Wrench } from 'lucide-react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/PageHeader'
+import { LogoutButton } from '@/components/nav/LogoutButton'
 import { Card, Row, rowClass } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { listDevices } from '@/lib/devices'
@@ -86,6 +87,15 @@ export default function SettingsPage() {
             )
           })}
         </Card>
+
+        <section className="mt-6 space-y-2">
+          <LogoutButton />
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            「登出所有裝置」會讓每一張已簽發的登入通行證立刻失效 ——
+            懷疑 cookie 外洩時用它。passkey 不受影響，不必重新註冊。
+          </p>
+          <LogoutButton allDevices />
+        </section>
       </div>
     </>
   )

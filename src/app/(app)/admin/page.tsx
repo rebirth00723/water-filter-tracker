@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { AdminPanels, type AdminState } from '@/components/admin/AdminPanels'
 import { listCredentials } from '@/lib/auth/passkey'
 import { requireAdmin } from '@/lib/auth/require'
+import { sessionSecretIsEnvControlled } from '@/lib/auth/session'
 import { fmtDateOnly } from '@/lib/date'
 import {
   CONFIG_KEYS,
@@ -54,6 +55,7 @@ export default async function AdminPage() {
       ),
       envLocked: [...envLocked],
     },
+    sessionSecretEnvControlled: sessionSecretIsEnvControlled(),
     passkey: {
       eligible: eligibility.eligible,
       reason: eligibility.reason,

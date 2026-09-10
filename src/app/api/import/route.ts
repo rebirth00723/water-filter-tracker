@@ -19,8 +19,32 @@ function bad(message: string, status = 400) {
  * 這裡是整個 App 唯一能一次改寫全部資料的入口，所以授權、
  * 大小上限與逐欄驗證三件事都不能省 —— 上傳的 JSON 是不可信輸入。
  */
+/**
+ * 同源檢查。
+ *
+ * Server Action 由 Next 原生比對 Origin 與 Host，但 route handler 沒有 ——
+ * 而這是整個 App 唯一能一次改寫全部資料的入口。
+ *
+ * session cookie 是 SameSite=Lax，所以跨站 POST 本來就不會帶上 cookie
+ * （requireUser 會擋下來）。這一層是縱深防禦：三行程式碼，
+ * 換掉「萬一哪天 cookie 屬性改了、或遇到不遵守 SameSite 的客戶端」那個尾巴。
+ */
+function sameOrigin(req: Request): boolean {
+  const origin = req.headers.get('origin')
+  // 非瀏覽器的客戶端（curl、腳本）不送 Origin —— 那些不是 CSRF 的載體
+  if (!origin) return true
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host')
+  if (!host) return false
+  try {
+    return new URL(origin).host === host
+  } catch {
+    return false
+  }
+}
+
 export async function POST(req: Request) {
   const user = await requireUser()
+  if (!sameOrigin(req)) return bad('跨來源的請求已被拒絕', 403)
 
   const form = await req.formData()
   const file = form.get('file')

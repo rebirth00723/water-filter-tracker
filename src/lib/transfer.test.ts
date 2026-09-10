@@ -246,3 +246,61 @@ describe('壞檔案', () => {
     expect(result.devices).toBe(2)
   })
 })
+
+describe('審查發現的回歸測試', () => {
+  it('notify_rules.sendTime 要跟著匯出與匯入', () => {
+    /*
+     * 這個欄位是在階段 7 加的，而 transfer.ts 寫於階段 6 —— 典型的漂移。
+     * 漏掉的後果是換一台機器之後，每條規則的自訂發送時刻都靜默退回全域預設，
+     * 而「當天到期要在出門前收到」這種設定就這樣消失了，使用者不會發現。
+     */
+    wipe()
+    db.insert(s.notifyRules)
+      .values({
+        kind: 'ADVANCE',
+        offsetDays: 0,
+        template: '{category} 今天到期',
+        priority: 4,
+        sendTime: '07:30',
+      })
+      .run()
+
+    const payload = transfer.exportAll()
+    expect(payload.notifyRules[0].sendTime).toBe('07:30')
+
+    wipe()
+    transfer.importAll(payload, 'replace')
+    expect(db.select().from(s.notifyRules).all()[0].sendTime).toBe('07:30')
+  })
+
+  it('匯出不含設備專屬的 ntfy topic', () => {
+    // UI 明寫「不含 ntfy 的連線與認證」，而 topic 在開放式伺服器上等同密碼
+    wipe()
+    db.insert(s.devices).values({ name: '機器', ntfyTopic: 'secret-topic-abc123' }).run()
+    const json = JSON.stringify(transfer.exportAll())
+    expect(json).not.toContain('secret-topic-abc123')
+  })
+
+  it('重複的來源 id 整筆拒絕，而不是靜默把歷史接到別台設備上', () => {
+    wipe()
+    const payload = transfer.exportAll()
+    payload.devices = [
+      { id: 1, name: 'A', model: null, installedOn: null, ntfyTopic: null, sort: 0, active: true },
+      { id: 1, name: 'B', model: null, installedOn: null, ntfyTopic: null, sort: 1, active: true },
+    ]
+    expect(() => transfer.importAll(payload, 'replace')).toThrow(/重複的設備 id/)
+  })
+
+  it('匯入的通知規則要通過與表單同一條交叉檢查', () => {
+    // 少了它，匯入可以造出一條沒有天數的 ADVANCE —— 它永遠不知道什麼時候該送
+    const base = transfer.exportAll()
+    const bad = {
+      ...base,
+      notifyRules: [
+        { kind: 'ADVANCE' as const, offsetDays: null, repeatDays: null,
+          template: 'x', priority: 3, sendTime: null, enabled: true },
+      ],
+    }
+    expect(transfer.importPayload.safeParse(bad).success).toBe(false)
+  })
+})

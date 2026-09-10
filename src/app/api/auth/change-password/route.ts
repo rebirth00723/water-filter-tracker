@@ -17,9 +17,30 @@ export async function POST(req: Request) {
   const user = getPrimaryUser()
   if (!user) return seeOther('/setup')
 
-  // 無密碼模式沒有 session，但也不該從這裡設密碼（那是 /admin 的入口）
-  if (user.passwordHash && (!session || session.username !== user.username)) {
+  /*
+   * 無密碼模式一律不從這裡設密碼 —— 那是 /admin 的入口。
+   *
+   * 原本的寫法是 `if (user.passwordHash && ...)`，於是 passwordHash 為 null 時
+   * **整段守門被跳過**，這支 route 變成「不需要任何憑證就能設定密碼」。
+   * 而它是 route handler，沒有 Server Action 的 Origin/Host 比對，
+   * 所以區網裡任何一個惡意頁面都能用一張自動送出的表單把屋主鎖在自己的資料外。
+   */
+  if (!user.passwordHash) return seeOther('/admin')
+
+  if (!session || session.username !== user.username) {
     return seeOther('/login')
+  }
+
+  /*
+   * tokenVersion 也要比對。
+   *
+   * 這裡原本是整個系統唯一不吃撤銷的端點，而它正好是能改密碼的那一個：
+   * 以臨時密碼登入的人在被撤銷之後，仍能用那張已作廢的 cookie
+   * （且因為 mustChangePassword 為 true 而不需要舊密碼）設定新密碼並取得
+   * 一張帶最新 tokenVersion 的全新 session，完成接管。
+   */
+  if (session.ver !== user.tokenVersion) {
+    return seeOther('/login?reason=revoked')
   }
 
   const form = await req.formData()

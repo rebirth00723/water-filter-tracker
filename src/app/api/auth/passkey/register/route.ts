@@ -61,6 +61,15 @@ export async function GET() {
     rpName: rp.rpName,
     rpID: rp.rpID,
     userName: me.username,
+    /*
+     * 固定的 user handle。不傳的話 simplewebauthn 每次都產生一個隨機值，
+     * 於是驗證器認不出「這是同一個帳號」——
+     * 重新註冊時不會取代舊的那把，而是又存一把新的，
+     * 使用者的鑰匙圈裡會慢慢累積一堆看起來一樣的項目。
+     *
+     * 這是單人系統，帳號名稱本身就是穩定且唯一的識別。
+     */
+    userID: new TextEncoder().encode(me.username),
     // 排除已註冊的，讓同一把鑰匙不會被註冊兩次
     excludeCredentials: existing.map((c) => ({
       id: c.credentialId,
@@ -118,6 +127,16 @@ export async function POST(req: Request) {
       expectedChallenge,
       expectedOrigin: rp.origin,
       expectedRPID: rp.rpID,
+      /*
+       * 必須與 options 的 userVerification 一致。
+       *
+       * options 要的是 'preferred'（不強制），但 simplewebauthn 的
+       * requireUserVerification **預設是 true** —— 兩邊不一致的結果是：
+       * 不做使用者驗證的驗證器（部分實體安全金鑰、未設 PIN 的裝置）
+       * 可以走完整個註冊儀式，卻在最後一步被伺服器拒絕，
+       * 而錯誤訊息完全看不出原因。
+       */
+      requireUserVerification: false,
     })
   } catch (err) {
     audit({

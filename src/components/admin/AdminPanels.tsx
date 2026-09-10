@@ -38,6 +38,8 @@ export interface AdminState {
   }
   passkey: { eligible: boolean; reason?: string; enabled: boolean }
   credentials: AdminCredential[]
+  /** 設了 SESSION_SECRET 時「重新產生」不可能生效，按鈕要停用並說明 */
+  sessionSecretEnvControlled: boolean
 }
 
 /** 由環境變數控制的欄位要唯讀並明確標示，而不是讓人填了卻不生效 */
@@ -62,7 +64,7 @@ export function AdminPanels({ state }: { state: AdminState }) {
         credentials={state.credentials}
         openMode={state.openMode}
       />
-      <SessionKeyPanel />
+      <SessionKeyPanel envControlled={state.sessionSecretEnvControlled} />
     </div>
   )
 }
@@ -405,7 +407,7 @@ function PasswordPanel({ openMode, username }: { openMode: boolean; username: st
   )
 }
 
-function SessionKeyPanel() {
+function SessionKeyPanel({ envControlled }: { envControlled: boolean }) {
   const regen = useAction(regenSessionKey, {
     onSuccess: () => toast.success('已重新產生 session 金鑰，所有裝置已登出'),
     onError: ({ error }) => toast.error(actionErrorMessage(error)),
@@ -431,6 +433,25 @@ function SessionKeyPanel() {
           <br />
           <strong>passkey 本身不受影響，不必重新註冊。</strong>
         </p>
+
+        {envControlled ? (
+          /*
+           * 設了 SESSION_SECRET 時這個動作不可能生效：key() 會優先讀環境變數，
+           * 所以寫一個新的金鑰檔完全不會被讀到 —— 當下看似成功，
+           * 但下一次重啟舊金鑰就回來了，撤銷被靜默還原。
+           * 停用並說明，比讓人按下去得到一個假的成功好。
+           */
+          <div className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2.5">
+            <p className="text-xs font-medium text-warning">
+              由環境變數 <code className="font-mono">SESSION_SECRET</code> 控制，無法從這裡重新產生
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              請在部署設定裡換掉那個值並重新啟動。
+              若只是想登出所有裝置，用「設定」頁的<strong>登出所有裝置</strong> ——
+              它遞增 tokenVersion，不受這個限制。
+            </p>
+          </div>
+        ) : (
         <ConfirmButton
           label="重新產生金鑰"
           variant="secondary"
@@ -448,6 +469,7 @@ function SessionKeyPanel() {
           pending={regen.isPending}
           onConfirm={() => regen.execute({})}
         />
+        )}
       </Card>
     </section>
   )

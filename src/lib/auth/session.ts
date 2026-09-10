@@ -71,8 +71,27 @@ function key(): Uint8Array {
   return (keyCache = new TextEncoder().encode(generated))
 }
 
-/** 重新產生金鑰：所有已登入的裝置立刻登出。passkey 本身不受影響 */
+/** session 金鑰是否由環境變數控制。UI 要據此把「重新產生」停用並說明原因 */
+export function sessionSecretIsEnvControlled(): boolean {
+  return env('SESSION_SECRET') !== undefined
+}
+
+/**
+ * 重新產生金鑰：所有已登入的裝置立刻登出。passkey 本身不受影響。
+ *
+ * **設有 SESSION_SECRET 時必須拒絕。** key() 會優先回傳環境變數的值，
+ * 所以寫一個新的金鑰檔完全不會被讀到 —— 當下因為 keyCache 被蓋掉而看似有效，
+ * 但**下一次重啟舊金鑰就回來了**，被撤銷的 cookie 在 30 天有效期內全部復活。
+ * 一個看起來成功、重啟後靜默還原的撤銷，比沒有這個按鈕危險得多。
+ */
 export function regenerateSessionKey(): void {
+  if (sessionSecretIsEnvControlled()) {
+    throw new Error(
+      'session 金鑰由環境變數 SESSION_SECRET 控制，無法從介面重新產生。' +
+        '請在部署設定裡換掉那個值並重新啟動；' +
+        '若只是想登出所有裝置，改用「登出所有裝置」（它遞增 tokenVersion，不受此限）。',
+    )
+  }
   const path = keyPath()
   const generated = randomBytes(48).toString('base64')
   mkdirSync(/*turbopackIgnore: true*/ dirname(path), { recursive: true })
@@ -144,9 +163,19 @@ export async function currentSession(): Promise<SessionPayload | null> {
   return readSessionToken(token)
 }
 
+/**
+ * 清除 session cookie。
+ *
+ * **刪除時的屬性必須與設定時一致，特別是 `Secure`。**
+ * `__Host-` 前綴依規範要求 cookie 同時具備 Secure、Path=/、無 Domain —— 
+ * 少了 Secure，瀏覽器會把整條 Set-Cookie 丟棄，於是那個 cookie **沒有被刪掉**。
+ * 症狀是：登出回到登入頁、稽核紀錄寫了「登出」，但按上一頁又是已登入狀態，
+ * 而且只在 HTTPS 部署下發生（純 HTTP 用的是沒有前綴的 plain cookie，看起來一切正常）。
+ *
+ * `__Host-` 前綴本來就只可能在 HTTPS 下存在，所以刪它時一律帶 secure: true。
+ */
 export async function clearSession(): Promise<void> {
   const store = await cookies()
-  for (const name of [SECURE_COOKIE, PLAIN_COOKIE]) {
-    store.set({ name, value: '', httpOnly: true, path: '/', maxAge: 0 })
-  }
+  store.set({ name: SECURE_COOKIE, value: '', httpOnly: true, secure: true, path: '/', maxAge: 0 })
+  store.set({ name: PLAIN_COOKIE, value: '', httpOnly: true, secure: false, path: '/', maxAge: 0 })
 }

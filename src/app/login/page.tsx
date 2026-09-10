@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { withBasePath } from '@/lib/base-path'
 import { AuthShell, ErrorNote, FieldLabel, buttonClass, inputClass } from '@/components/AuthShell'
 import { PasskeyLoginButton } from '@/components/passkey/PasskeyLoginButton'
 import { authMessage } from '@/lib/auth/messages'
@@ -30,7 +31,7 @@ export default async function LoginPage({
 
       <form
         method="POST"
-        action="/api/auth/login"
+        action={withBasePath('/api/auth/login')}
         className="space-y-4 rounded-lg border border-border bg-card p-5"
       >
         {next && <input type="hidden" name="next" value={next} />}

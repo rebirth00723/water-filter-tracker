@@ -1,8 +1,8 @@
 import 'server-only'
-import { and, asc, eq, lt, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, lt, or, sql } from 'drizzle-orm'
 import { audit } from '../audit'
 import { getPublicUrl } from '../config'
-import { addDays, diffDays, currentHour, currentDate } from '../date'
+import { addDays, currentDate, currentHour, currentMinute, diffDays } from '../date'
 import { db } from '../db'
 import { categories, devices, items, notifyLog, notifyRules } from '../db/schema'
 import { devicePath } from '../device-path'
@@ -36,12 +36,21 @@ export interface SweepResult {
 }
 
 const MAX_ATTEMPTS = 5
+/** 超過這個時間還停在 pending 的列，視為「claim 之後 process 死掉」而撿回重送 */
+const STALE_PENDING_MS = 10 * 60_000
 
-/** 逐條規則的發送時刻 → 小時。留空沿用全域預設 */
-function sendHour(ruleSendTime: string | null): number {
+/**
+ * 逐條規則的發送時刻 → 當天的第幾分鐘。留空沿用全域預設。
+ *
+ * 用分鐘而不是小時：設定頁的欄位是 `<input type="time">`，使用者填得出 07:30，
+ * 而只取小時的話那則通知會在 07:00 的那一次掃描就送出 —— 提早 30 分鐘。
+ * 掃描每 15 分鐘一次，所以分鐘是有意義的精度。
+ */
+function sendMinuteOfDay(ruleSendTime: string | null): number {
   const raw = ruleSendTime?.trim() || getSetting('notify.sendTime', '09:00')
-  const h = Number(raw.split(':')[0])
-  return Number.isInteger(h) && h >= 0 && h <= 23 ? h : 9
+  const [h, m] = raw.split(':').map(Number)
+  if (!Number.isInteger(h) || h < 0 || h > 23) return 9 * 60
+  return h * 60 + (Number.isInteger(m) && m >= 0 && m <= 59 ? m : 0)
 }
 
 /** 該種類底下啟用中的耗材，用於樣板的 {items} */
@@ -76,6 +85,7 @@ export async function sweep(opts: { force?: boolean; now?: Date } = {}): Promise
   const now = opts.now ?? new Date()
   const today = currentDate(now)
   const hour = currentHour(now)
+  const minuteOfDay = hour * 60 + currentMinute(now)
   const result: SweepResult = { scanned: 0, sent: 0, failed: 0, skipped: 0, retried: 0, notes: [] }
 
   if (!ntfyConfigured('filter')) {
@@ -101,8 +111,16 @@ export async function sweep(opts: { force?: boolean; now?: Date } = {}): Promise
     )
     result.scanned += dues.length
 
-    /** 超過補送上限的項目，最後彙總成一則 */
-    const digest: string[] = []
+    /**
+     * 超過補送上限的項目，最後彙總成一則。
+     *
+     * 用 Map 以 categoryId 去重：外層是「每條規則 × 每個種類」的雙迴圈，
+     * 而 seed 就帶了三條 ADVANCE 規則 —— 不去重的話同一個種類會在彙總裡
+     * 出現三次，訊息看起來像壞掉的。
+     */
+    const digest = new Map<number, string>()
+    /** 被 skipped 佔位的那幾列。彙總送不出去時要退回 failed，否則永久遺失 */
+    const digestClaimIds: number[] = []
 
     for (const rule of rules) {
       for (const due of dues) {
@@ -120,15 +138,27 @@ export async function sweep(opts: { force?: boolean; now?: Date } = {}): Promise
           const claimed = claim(rule.id, due.categoryId, plan.logDueOn, plan.logKind, 'skipped')
           if (claimed) {
             result.skipped += 1
-            digest.push(`${due.name}（${plan.lateBy} 天前就該提醒）`)
+            digestClaimIds.push(claimed)
+            // 同一個種類只列一次，取最早該提醒的那一筆天數
+            const existing = digest.get(due.categoryId)
+            if (!existing || plan.lateBy > Number(existing.match(/（(\d+) 天/)?.[1] ?? 0)) {
+              digest.set(due.categoryId, `${due.name}（${plan.lateBy} 天前就該提醒）`)
+            }
           }
           continue
         }
 
         // 發送時刻的閘門。手動觸發可以跳過，但去重不跳過
-        if (!opts.force && hour < sendHour(rule.sendTime)) continue
+        if (!opts.force && minuteOfDay < sendMinuteOfDay(rule.sendTime)) continue
 
-        const claimed = claim(rule.id, due.categoryId, plan.logDueOn, plan.logKind, 'pending')
+        const claimed = claim(
+          rule.id,
+          due.categoryId,
+          plan.logDueOn,
+          plan.logKind,
+          'pending',
+          plan.days,
+        )
         if (!claimed) continue // 送過了
 
         const message = renderTemplate(rule.template, {
@@ -152,8 +182,15 @@ export async function sweep(opts: { force?: boolean; now?: Date } = {}): Promise
       }
     }
 
-    if (digest.length > 0) {
-      await sendDigest(device.name, digest, topicFor(device.ntfyTopic), clickUrl(device.id), result)
+    if (digest.size > 0) {
+      await sendDigest(
+        device.name,
+        [...digest.values()],
+        topicFor(device.ntfyTopic),
+        clickUrl(device.id),
+        result,
+        digestClaimIds,
+      )
     }
   }
 
@@ -255,10 +292,27 @@ function claim(
   dueOn: string,
   kind: string,
   status: 'pending' | 'skipped',
+  /**
+   * 當初規劃時算出來的天數，一起存下來。
+   *
+   * 重試時**不能重算** —— 重算用的是「現在的到期狀態」，而那可能已經變了
+   *（使用者換了濾心、改了週期）。結果是重試送出一則數字完全對不上的訊息：
+   * 「還有 14 天」變成「還有 87 天」，或者反過來。
+   * 訊息的內容應該是它被規劃的那一刻的樣子。
+   */
+  plannedDays?: number,
 ): number | null {
   const rows = db
     .insert(notifyLog)
-    .values({ ruleId, categoryId, target: '', dueOn, kind, status })
+    .values({
+      ruleId,
+      categoryId,
+      target: '',
+      dueOn,
+      kind,
+      status,
+      plannedDays: plannedDays ?? null,
+    })
     .onConflictDoNothing()
     .returning({ id: notifyLog.id })
     .all()
@@ -316,19 +370,52 @@ async function deliver(args: {
 
 /** 撿回上次失敗的。超過 5 次就停止並留在設定頁標紅 */
 async function retryFailed(result: SweepResult): Promise<number> {
+  /*
+   * 同時撿回 'failed' 與**卡住的 'pending'**。
+   *
+   * claim() 先插一列 pending 再送出，所以 process 在這兩步之間死掉
+   *（容器被 kill、NAS 斷電）會留下一列永遠不動的 pending：
+   * 它已經佔住了去重鍵，所以不會被重新 claim；而重試只看 failed，
+   * 所以也不會被撿回 —— 那則通知就這樣人間蒸發，UI 上也看不到。
+   *
+   * 加上 claimedAt 的年齡條件，避免把「這一輪剛 claim、正要送出」的那列
+   * 也當成卡住的。
+   */
+  const staleBefore = Date.now() - STALE_PENDING_MS
+
+  /*
+   * **用一個 UPDATE…RETURNING 原子地佔位**，而不是先 SELECT 再逐一送。
+   *
+   * croner 的 protect 擋得住兩次排程掃描重疊，但擋不住
+   * 「管理中心手動觸發」與「排程」同時跑 —— 那兩條路徑是各自獨立的。
+   * 先 SELECT 的話兩邊會讀到同一批 failed 列，然後各送一次，
+   * 使用者收到重複的提醒（而重複提醒正是去重機制存在的理由）。
+   *
+   * 把狀態翻成 pending 並更新 claimedAt，第二個掃描的 WHERE 就選不到它了。
+   */
   const pending = db
-    .select({
+    .update(notifyLog)
+    .set({ status: 'pending', claimedAt: Date.now() })
+    .where(
+      and(
+        lt(notifyLog.attempts, MAX_ATTEMPTS),
+        or(
+          eq(notifyLog.status, 'failed'),
+          and(eq(notifyLog.status, 'pending'), lt(notifyLog.claimedAt, staleBefore)),
+        ),
+      ),
+    )
+    .returning({
       id: notifyLog.id,
       ruleId: notifyLog.ruleId,
       categoryId: notifyLog.categoryId,
       dueOn: notifyLog.dueOn,
       kind: notifyLog.kind,
       attempts: notifyLog.attempts,
+      plannedDays: notifyLog.plannedDays,
     })
-    .from(notifyLog)
-    .where(and(eq(notifyLog.status, 'failed'), lt(notifyLog.attempts, MAX_ATTEMPTS)))
-    .limit(20)
     .all()
+    .slice(0, 20)
   if (pending.length === 0) return 0
 
   for (const row of pending) {
@@ -347,7 +434,20 @@ async function retryFailed(result: SweepResult): Promise<number> {
 
     const dues = categoryDues(cat.deviceId, currentDate())
     const due = dues.find((d) => d.categoryId === cat.id)
-    if (!due?.due.dueOn) continue
+    if (!due?.due.dueOn) {
+      /*
+       * 到期日消失了（週期被清空、起算日被移除）。
+       *
+       * 原本這裡是 `continue` —— attempts 不增加、狀態不變，
+       * 於是這一列**永遠**留在重試佇列裡：每次掃描都撿一次、每次都跳過，
+       * 而設定頁的失敗清單上會一直掛著一筆使用者無論如何都清不掉的紀錄。
+       */
+      db.update(notifyLog)
+        .set({ status: 'skipped', lastError: '這個種類已經沒有到期日，不再重試' })
+        .where(eq(notifyLog.id, row.id))
+        .run()
+      continue
+    }
 
     await deliver({
       logId: row.id,
@@ -355,7 +455,8 @@ async function retryFailed(result: SweepResult): Promise<number> {
         device: device.name,
         category: cat.name,
         items: itemsLabel(cat.id),
-        days: Math.abs(due.due.daysLeft ?? 0),
+        // 用規劃當下的天數，不重算 —— 見 claim() 的 plannedDays 說明
+        days: row.plannedDays ?? Math.abs(due.due.daysLeft ?? 0),
         dueOn: due.due.dueOn,
       }),
       title: `${device.name} · ${cat.name}`,
@@ -375,6 +476,7 @@ async function sendDigest(
   topic: string | undefined,
   click: string | undefined,
   result: SweepResult,
+  claimedIds: number[] = [],
 ) {
   try {
     const res = await sendNtfy({
@@ -391,6 +493,20 @@ async function sendDigest(
     log.info('已送出離線彙總', { topic: res.topic, count: lines.length })
     result.sent += 1
   } catch (err) {
+    /*
+     * 彙總送不出去時，把佔位的那幾列從 skipped 退回 failed。
+     *
+     * skipped 既不重試也不可能再被 claim（去重鍵已經被佔住），
+     * 所以不退回的話這批提醒**永久消失** —— 而使用者完全不會知道，
+     * 因為送不出去的通知本來就不會用推播告知。
+     * 退回 failed 之後它們會進入重試佇列，也會出現在設定頁的紅色清單裡。
+     */
+    if (claimedIds.length > 0) {
+      db.update(notifyLog)
+        .set({ status: 'failed', lastError: `離線彙總送出失敗：${(err as Error).message}`.slice(0, 500) })
+        .where(inArray(notifyLog.id, claimedIds))
+        .run()
+    }
     log.warn('離線彙總送出失敗', { err })
     result.notes.push(`彙總送出失敗：${(err as Error).message}`)
   }

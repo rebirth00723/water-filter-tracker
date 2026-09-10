@@ -205,6 +205,15 @@ export const notifyLog = sqliteTable(
     dueOn: text('due_on').notNull(),
     kind: text('kind').notNull(),
     status: text('status').$type<NotifyStatus>().notNull(),
+    /**
+     * 規劃當下算出來的天數（ADVANCE 是剩餘、OVERDUE 是已逾期）。
+     *
+     * 存下來是為了重試時**不重算** —— 重算用的是「現在的到期狀態」，
+     * 而那在使用者換了濾心或改了週期之後就變了，
+     * 於是重試會送出一則數字完全對不上的訊息。
+     * 訊息的內容應該是它被規劃的那一刻的樣子。
+     */
+    plannedDays: integer('planned_days'),
     attempts: integer('attempts').notNull().default(0),
     lastError: text('last_error'),
     claimedAt: integer('claimed_at').notNull().$defaultFn(now),

@@ -231,6 +231,22 @@ export function EventForm({
         PPM 是會消失的輸入（水倒掉、筆歸零就沒了），必須先打完；
         換了哪幾支濾心事後回想得起來。
       */}
+      {/*
+        從「更換」切成「新購」會刪掉這筆事件擁有的水質紀錄（PPM 只存在
+        readings 一張表，由事件擁有）。而切過去之後 PPM 欄位整個消失，
+        使用者根本看不到自己正要丟掉什麼 —— 所以要在切換前就講。
+      */}
+      {editing && event.reading && !isReplace && (
+        <p
+          role="alert"
+          className="rounded-md bg-warning/10 px-3 py-2 text-xs leading-relaxed text-warning"
+        >
+          這筆原本記了當天的水質（原水 {event.reading.rawPpm} / 純水{' '}
+          {event.reading.purePpm} ppm）。改成「新購」並儲存之後<strong>那筆水質紀錄會被刪除</strong>
+          ，報表上的那個點也會消失。想保留的話請切回「更換」。
+        </p>
+      )}
+
       {isReplace ? (
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">當天水質（可略）</legend>

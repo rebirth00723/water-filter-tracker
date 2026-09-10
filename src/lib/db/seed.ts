@@ -25,8 +25,20 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   'audit.keepDays': '180',
 }
 
-/** 冪等：重複執行不會產生重複資料 */
+/**
+ * 只在**全新的資料庫**上種一次。
+ *
+ * 判斷依據是一個 settings 旗標，而不是「表格是不是空的」——
+ * 後者會在使用者刻意刪光通知規則（或刪光設備）之後，
+ * **每次重啟都把它們種回來**。那不是冪等，是跟使用者搶方向盤：
+ * 他刪了三次、重啟三次，東西回來三次，而且沒有任何訊息說明為什麼。
+ */
+const SEEDED_FLAG = 'db.seeded'
+
 export function seedIfEmpty() {
+  const already = db.select().from(settings).where(eq(settings.key, SEEDED_FLAG)).get()
+  if (already) return
+
   const existing = db.select({ id: devices.id }).from(devices).limit(1).all()
 
   if (existing.length === 0) {
@@ -60,4 +72,7 @@ export function seedIfEmpty() {
     const hit = db.select().from(settings).where(eq(settings.key, key)).limit(1).all()
     if (hit.length === 0) db.insert(settings).values({ key, value }).run()
   }
+
+  // 種完才立旗標：中途失敗的話下次啟動會重來，而不是留下半套
+  db.insert(settings).values({ key: SEEDED_FLAG, value: new Date().toISOString() }).run()
 }

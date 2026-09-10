@@ -92,6 +92,22 @@ export function optionalNonNegativeInt(max: number, label: string) {
 }
 
 /**
+ * ntfy 的 topic 名稱。
+ *
+ * 規則與 `lib/notify/ntfy.ts` 的 TOPIC_RE 同一條（英數字、`-`、`_`，最長 64）。
+ * **儲存時就要驗**：只在發送端驗的話，設定頁會顯示「已儲存」，
+ * 而那個設定讓該頻道的通知**每一次都送不出去** ——
+ * 而送不出去的通知不會用推播告知，所以使用者要等到很久以後
+ * 才會從設定頁的紅色清單發現。
+ */
+export const optionalNtfyTopic = z
+  .string()
+  .trim()
+  .regex(/^[-_A-Za-z0-9]*$/, 'topic 只能用英文字母、數字、- 與 _')
+  .max(64, 'topic 最長 64 個字元')
+  .transform((v) => (v === '' ? null : v))
+
+/**
  * 十六進位色碼。限制成 `#rrggbb` 而不接受簡寫或色彩名稱 ——
  * 這個值會直接送進 ECharts 的 itemStyle 與 inline style，
  * 格式統一才不必在每個消費端各寫一次正規化。

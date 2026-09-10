@@ -1,3 +1,4 @@
+import { withBasePath } from '@/lib/base-path'
 import { AuthShell, ErrorNote, FieldLabel, buttonClass, inputClass } from '@/components/AuthShell'
 import { authMessage } from '@/lib/auth/messages'
 import { requireSessionAllowingPasswordChange } from '@/lib/auth/require'
@@ -21,7 +22,7 @@ export default async function ChangePasswordPage({
     >
       <form
         method="POST"
-        action="/api/auth/change-password"
+        action={withBasePath('/api/auth/change-password')}
         className="space-y-4 rounded-lg border border-border bg-card p-5"
       >
         {/* 密碼管理器需要一個 username 欄位才能正確關聯與儲存 */}

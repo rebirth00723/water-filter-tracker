@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { NOTIFY_RULE_KINDS } from '@/lib/db/schema'
-import { dbId, optionalText, positiveInt } from './common'
+import { dbId, optionalNtfyTopic, optionalText, positiveInt } from './common'
 
 /** HH:MM。留空＝沿用全域預設 */
 export const optionalTime = z
@@ -64,8 +64,8 @@ export const notifyPrefs = z.object({
 /** 管理中心的 ntfy 連線設定 */
 export const ntfyConfigSchema = z.object({
   url: optionalText(200),
-  topicFilter: optionalText(64),
-  topicSecurity: optionalText(64),
+  topicFilter: optionalNtfyTopic,
+  topicSecurity: optionalNtfyTopic,
   /** 留空＝不變更（不回顯已存的值） */
   token: optionalText(200),
   user: optionalText(80),
@@ -73,6 +73,25 @@ export const ntfyConfigSchema = z.object({
   /** 明確清除認證 */
   clearAuth: z.boolean().default(false),
 })
+  /*
+   * 帳號與密碼必須成對。
+   *
+   * 原本只填一個的話會走到 `else if (v.user && v.password)` 的 false 分支，
+   * 於是整段認證被**靜默丟棄**，而畫面回報「已儲存」、稽核紀錄還寫下
+   * 「已更新帳密」—— 使用者以為設好了，實際上通知全部因為未授權而失敗。
+   */
+  .superRefine((v, ctx) => {
+    if (v.clearAuth) return
+    const hasUser = v.user !== null
+    const hasPassword = v.password !== null
+    if (hasUser !== hasPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [hasUser ? 'password' : 'user'],
+        message: '帳號與密碼要一起填。只想改其中一個的話，兩個都重新輸入一次',
+      })
+    }
+  })
 
 export const testNotifySchema = z.object({
   channel: z.enum(['filter', 'security']),

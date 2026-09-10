@@ -337,6 +337,40 @@ export function recentTemplates(deviceId: number, take = 3): Template[] {
   return [...seen.values()]
 }
 
+/**
+ * 這些明細是否全部屬於這台設備。
+ *
+ * 客戶端送來的 itemId 與 categoryId 各自合法，但**組合起來未必屬於同一台設備** ——
+ * zod 驗的是形狀，擋不住這種「形狀正確但關係不對」的輸入。
+ * 不擋的話可以把 A 機的濾心記到 B 機的更換紀錄上：
+ * 兩邊的庫存與到期日都會算錯，而且沒有任何錯誤訊息。
+ *
+ * 順便驗 categoryId 與該耗材當下的種類一致 —— 那個欄位是快照，
+ * 但快照的初始值必須是真的。
+ */
+export function validateLines(
+  deviceId: number,
+  lines: { itemId: number; categoryId: number }[],
+): string | null {
+  if (lines.length === 0) return null
+  const owned = db
+    .select({ itemId: items.id, categoryId: items.categoryId, itemName: items.name })
+    .from(items)
+    .innerJoin(categories, eq(items.categoryId, categories.id))
+    .where(and(eq(categories.deviceId, deviceId), inArray(items.id, lines.map((l) => l.itemId))))
+    .all()
+  const byItem = new Map(owned.map((r) => [r.itemId, r]))
+
+  for (const l of lines) {
+    const hit = byItem.get(l.itemId)
+    if (!hit) return `耗材 #${l.itemId} 不屬於這台設備`
+    if (hit.categoryId !== l.categoryId) {
+      return `「${hit.itemName}」的種類對不上，請重新選一次`
+    }
+  }
+  return null
+}
+
 // ───────────────────────── 寫入（含 reading 連動）─────────────────────────
 
 export interface EventLineInput {

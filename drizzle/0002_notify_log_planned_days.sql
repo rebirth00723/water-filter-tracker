@@ -1,0 +1,1 @@
+ALTER TABLE `notify_log` ADD `planned_days` integer;

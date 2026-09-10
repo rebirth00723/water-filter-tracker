@@ -7,7 +7,7 @@ import { audit } from '@/lib/audit'
 import { clientIp, userAgent } from '@/lib/auth/client-ip'
 import { validatePassword } from '@/lib/auth/password'
 import { requireAdmin } from '@/lib/auth/require'
-import { regenerateSessionKey } from '@/lib/auth/session'
+import { regenerateSessionKey, sessionSecretIsEnvControlled } from '@/lib/auth/session'
 import { bumpTokenVersion, setPassword } from '@/lib/auth/store'
 import {
   CONFIG_KEYS,
@@ -127,7 +127,13 @@ export const saveNtfyConfig = adminAction
       summary:
         `修改 ntfy 設定：伺服器「${v.url ?? '(未設定)'}」、` +
         `濾心 topic「${v.topicFilter ?? '(未設定)'}」、安全 topic「${v.topicSecurity ?? '(未設定)'}」` +
-        (v.clearAuth ? '，已清除認證' : v.token ? '，已更新 token' : v.user ? '，已更新帳密' : ''),
+        (v.clearAuth
+          ? '，已清除認證'
+          : v.token
+            ? '，已更新 token'
+            : v.user && v.password
+              ? '，已更新帳密'
+              : ''),
     })
     refresh()
     return {
@@ -225,7 +231,12 @@ export const regenSessionKey = adminAction
   .metadata({ name: 'admin.regenSessionKey' })
   .inputSchema(z.object({}))
   .action(async ({ ctx }) => {
-    regenerateSessionKey()
+    try {
+      regenerateSessionKey()
+    } catch (err) {
+      // 由環境變數控制時 regenerateSessionKey 會拒絕 —— 訊息本來就是寫給使用者看的
+      throw new ActionError((err as Error).message)
+    }
     ctx.note({
       action: 'admin.regenSessionKey',
       summary: '重新產生 session 金鑰，所有已登入的裝置都已登出',

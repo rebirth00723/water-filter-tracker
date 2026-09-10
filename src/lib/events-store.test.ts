@@ -307,3 +307,32 @@ describe('成本與範本', () => {
     expect(store.recentTemplates(deviceId)).toEqual([])
   })
 })
+
+describe('審查發現的回歸測試', () => {
+  it('明細必須屬於這台設備 —— 形狀正確但關係不對的輸入要擋下', () => {
+    /*
+     * itemId 與 categoryId 各自合法，但組合起來未必屬於同一台設備。
+     * 不擋的話可以把 A 機的濾心記到 B 機的更換紀錄上，
+     * 兩邊的庫存與到期日都會算錯，而且沒有任何錯誤訊息。
+     */
+    const other = db.insert(s.devices).values({ name: '別台' }).returning().get().id
+    const otherCat = db
+      .insert(s.categories)
+      .values({ deviceId: other, name: '第一道', color: '#14b8a6' })
+      .returning()
+      .get().id
+    const otherItem = db
+      .insert(s.items).values({ categoryId: otherCat, name: '別台的 PP 棉' }).returning().get().id
+
+    // 別台的耗材記到這台
+    expect(store.validateLines(deviceId, [{ itemId: otherItem, categoryId: otherCat }]))
+      .toMatch(/不屬於這台設備/)
+    // 自己的耗材配錯種類
+    expect(store.validateLines(deviceId, [{ itemId: itemPP, categoryId: catRO }]))
+      .toMatch(/種類對不上/)
+    // 正確的組合過關
+    expect(store.validateLines(deviceId, [{ itemId: itemPP, categoryId: catPP }])).toBeNull()
+    // 空清單不算錯（zod 另外擋「至少一項」）
+    expect(store.validateLines(deviceId, [])).toBeNull()
+  })
+})

@@ -45,6 +45,14 @@ const deviceIn = z.object({
   name: z.string().min(1).max(40),
   model: z.string().max(60).nullable().default(null),
   installedOn: ymd.nullable().default(null),
+  /**
+   * 設備專屬 ntfy topic。
+   *
+   * **匯入時接受、匯出時不帶。** UI 明寫「不含 ntfy 的連線與認證」，
+   * 而 topic 在開放式 ntfy 伺服器上等同密碼（知道名稱就能訂閱與發布）——
+   * 匯出檔常常會被傳來傳去，不該夾帶它。
+   * 匯入端保留這個欄位是為了讓手改過的檔案仍然可用。
+   */
   ntfyTopic: z.string().max(80).nullable().default(null),
   sort: z.number().int().default(0),
   active: z.boolean().default(true),
@@ -102,14 +110,33 @@ const readingIn = z.object({
   note: z.string().max(200).nullable().default(null),
 })
 
-const notifyRuleIn = z.object({
-  kind: z.enum(NOTIFY_RULE_KINDS),
-  offsetDays: z.number().int().nullable().default(null),
-  repeatDays: z.number().int().nullable().default(null),
-  template: z.string().min(1).max(400),
-  priority: z.number().int().min(1).max(5).default(3),
-  enabled: z.boolean().default(true),
-})
+const notifyRuleIn = z
+  .object({
+    kind: z.enum(NOTIFY_RULE_KINDS),
+    offsetDays: z.number().int().min(0).max(365).nullable().default(null),
+    repeatDays: z.number().int().min(1).max(365).nullable().default(null),
+    template: z.string().min(1).max(400),
+    priority: z.number().int().min(1).max(5).default(3),
+    /**
+     * 逐條的發送時刻。**這個欄位一度漏掉** —— 於是換一台機器之後，
+     * 每條規則的自訂時刻都靜默退回全域預設，而「當天到期要在出門前收到」
+     * 這種設定就這樣消失了，使用者不會發現。
+     */
+    sendTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .nullable()
+      .default(null),
+    enabled: z.boolean().default(true),
+  })
+  /*
+   * 與表單 schema 同一條交叉檢查（見 lib/schemas/notify.ts）。
+   * 少了它，匯入可以造出 UI 造不出來的規則 —— 例如一條沒有天數的
+   * ADVANCE，它永遠不知道什麼時候該送。
+   */
+  .refine((v) => (v.kind === 'ADVANCE' ? v.offsetDays !== null : v.repeatDays !== null), {
+    message: 'ADVANCE 規則需要 offsetDays，OVERDUE 規則需要 repeatDays',
+  })
 
 export const importPayload = z.object({
   format: z.literal(EXPORT_FORMAT),
@@ -135,18 +162,19 @@ export function exportAll(): ImportPayload {
     format: EXPORT_FORMAT,
     version: EXPORT_VERSION,
     exportedAt: new Date().toISOString(),
+    // ntfyTopic 刻意不匯出，見 deviceIn 的說明
     devices: db
       .select({
         id: devices.id,
         name: devices.name,
         model: devices.model,
         installedOn: devices.installedOn,
-        ntfyTopic: devices.ntfyTopic,
         sort: devices.sort,
         active: devices.active,
       })
       .from(devices)
-      .all(),
+      .all()
+      .map((d) => ({ ...d, ntfyTopic: null })),
     categories: db
       .select({
         id: categories.id,
@@ -216,6 +244,7 @@ export function exportAll(): ImportPayload {
         repeatDays: notifyRules.repeatDays,
         template: notifyRules.template,
         priority: notifyRules.priority,
+        sendTime: notifyRules.sendTime,
         enabled: notifyRules.enabled,
       })
       .from(notifyRules)
@@ -251,8 +280,36 @@ export interface ImportResult {
  * 合併模式**不帶入 notify_rules 與 settings**：那些是這台機器的偏好，
  * 重複匯入通知規則會讓每一則提醒送兩次。
  */
+/**
+ * 匯入檔裡的 id 必須唯一。
+ *
+ * 不檢查的話，一份重複了 device id 的檔案會讓後面那筆覆蓋 map 裡的前一筆，
+ * 於是前一台設備的所有種類、事件與水質紀錄**靜默接到後一台上** ——
+ * 資料沒有遺失但全部長錯地方，而且沒有任何錯誤訊息。
+ * 這種檔案只會來自手改或別的工具產生，正因如此更該擋。
+ */
+function assertUniqueIds(payload: ImportPayload): void {
+  const groups: [string, { id: number }[]][] = [
+    ['設備', payload.devices],
+    ['種類', payload.categories],
+    ['耗材', payload.items],
+    ['事件', payload.events],
+    ['水質紀錄', payload.readings],
+  ]
+  for (const [label, rows] of groups) {
+    const seen = new Set<number>()
+    for (const r of rows) {
+      if (seen.has(r.id)) {
+        throw new Error(`匯入檔裡有重複的${label} id：${r.id}。這份檔案的關聯無法可靠地還原。`)
+      }
+      seen.add(r.id)
+    }
+  }
+}
+
 export function importAll(payload: ImportPayload, mode: ImportMode): ImportResult {
   const skipped: string[] = []
+  assertUniqueIds(payload)
 
   return db.transaction((tx) => {
     if (mode === 'replace') {

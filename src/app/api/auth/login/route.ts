@@ -32,7 +32,17 @@ const FLOOR_MS = 500
  * 進來的值若已帶前綴（連結都會帶）就先剝掉，否則子路徑部署會變成 /water/water/…
  */
 function safeNext(next: string | null): string {
-  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/'
+  if (!next) return '/'
+  /*
+   * 反斜線要一起擋。瀏覽器在解析網址時把 `\` 正規化成 `/`，
+   * 所以 `/\evil.com` 會變成 `//evil.com` —— 一個 protocol-relative 的絕對網址。
+   * 只檢查 `//` 的話這條路徑會通過，變成登入後的開放轉址。
+   */
+  const normalized = next.replace(/\\/g, '/')
+  if (!normalized.startsWith('/') || normalized.startsWith('//')) return '/'
+  // 控制字元同樣可能被瀏覽器忽略後改變語意
+  if (/[\x00-\x1f\x7f]/.test(next)) return '/'
+  next = normalized
   if (BASE_PATH && next.startsWith(`${BASE_PATH}/`)) return next.slice(BASE_PATH.length)
   if (BASE_PATH && next === BASE_PATH) return '/'
   return next

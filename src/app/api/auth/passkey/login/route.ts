@@ -26,6 +26,18 @@ function bad(message: string, status = 400) {
   return Response.json({ ok: false, message }, { status })
 }
 
+/** 從 base64url 的 clientDataJSON 取出 challenge。壞掉的輸入回 undefined，由後續流程拒絕 */
+function challengeFromClientData(clientDataJSON: string | undefined): string | undefined {
+  if (!clientDataJSON) return undefined
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(clientDataJSON, 'base64url').toString('utf8'))
+    const c = (parsed as { challenge?: unknown })?.challenge
+    return typeof c === 'string' ? c : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * passkey 登入。
  *
@@ -76,7 +88,16 @@ export async function POST(req: Request) {
     return bad('缺少驗證器的回應')
   }
 
-  const expectedChallenge = takeChallenge('login', user.username)
+  /*
+   * 從 clientDataJSON 取出這次回應對應的挑戰值，用來命中正確的槽位。
+   *
+   * 這個值來自客戶端，但**不構成信任問題**：takeChallenge 會比對完整的值，
+   * 而 verifyAuthenticationResponse 又會拿它與簽章一起驗。
+   * 這裡只是用它「找到是哪一個進行中的挑戰」，
+   * 好處是別人打一次 GET 端點不會洗掉你進行中的那一個。
+   */
+  const presented = challengeFromClientData(body.response.response?.clientDataJSON)
+  const expectedChallenge = takeChallenge('login', user.username, presented)
   if (!expectedChallenge) return bad('挑戰已逾時，請重新嘗試', 410)
 
   const [ip, ua] = await Promise.all([clientIp(), userAgent()])
@@ -99,6 +120,7 @@ export async function POST(req: Request) {
       expectedChallenge,
       expectedOrigin: rp.origin,
       expectedRPID: rp.rpID,
+      requireUserVerification: false,
       credential: {
         id: stored.credentialId,
         publicKey: new Uint8Array(Buffer.from(stored.publicKey, 'base64url')),

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { withBasePath } from '@/lib/base-path'
 import { AuthShell, ErrorNote, FieldLabel, buttonClass, inputClass } from '@/components/AuthShell'
 import { authMessage } from '@/lib/auth/messages'
 import { isInitialized } from '@/lib/auth/store'
@@ -21,7 +22,7 @@ export default async function SetupPage({
     <AuthShell title="淨水器記錄" description="第一次使用，先建立你的帳號">
       <form
         method="POST"
-        action="/api/auth/setup"
+        action={withBasePath('/api/auth/setup')}
         className="space-y-4 rounded-lg border border-border bg-card p-5"
       >
         <div className="space-y-1.5">

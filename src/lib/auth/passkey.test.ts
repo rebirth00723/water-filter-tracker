@@ -132,8 +132,24 @@ describe('挑戰是一次性的', () => {
     // 混在一起的話，一個進行中的註冊會被一次登入嘗試偷走挑戰
     pk.saveChallenge('register', 'rose', 'reg-1')
     pk.saveChallenge('login', 'rose', 'log-1')
-    expect(pk.takeChallenge('login', 'rose')).toBe('log-1')
+    expect(pk.takeChallenge('login', 'rose', 'log-1')).toBe('log-1')
     expect(pk.takeChallenge('register', 'rose')).toBe('reg-1')
+  })
+
+  it('登入挑戰可同時存在數個 —— 別人打一次 GET 不會洗掉你進行中的那個', () => {
+    /*
+     * 產生登入挑戰的 GET 端點不需要驗證（那是它的用途）。
+     * 單一槽位的話，任何人打一次就會讓使用者按了 Face ID 之後
+     * 得到「挑戰已逾時」。
+     */
+    pk.saveChallenge('login', 'rose', 'mine-abcdefghijk')
+    pk.saveChallenge('login', 'rose', 'someone-elses-xyz')
+    expect(pk.takeChallenge('login', 'rose', 'mine-abcdefghijk')).toBe('mine-abcdefghijk')
+  })
+
+  it('挑戰值對不上時回 null，不會拿別的槽位頂替', () => {
+    pk.saveChallenge('login', 'rose', 'real-challenge-1')
+    expect(pk.takeChallenge('login', 'rose', 'forged-challenge')).toBeNull()
   })
 
   it('沒有挑戰時回 null 而不是拋錯', () => {

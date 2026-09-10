@@ -133,9 +133,18 @@ export function EventList({
                     </div>
 
                     <div className="flex shrink-0 flex-col items-end gap-1">
+                      {/*
+                        ADJUST（盤點調整）的編輯介面刻意還沒做（見計畫的「刻意延後」）。
+                        而這個表單只有「更換／新購」兩個選項，
+                        所以讓 ADJUST 進到編輯畫面會把它**靜默轉成 REPLACE** ——
+                        庫存反向、到期起算日被重設，而使用者只是想改個備註。
+                        擋在這裡，直到 ADJUST 有自己的表單為止。
+                      */}
                       <Button
                         variant="ghost"
                         size="icon"
+                        disabled={ev.type === 'ADJUST'}
+                        title={ev.type === 'ADJUST' ? '盤點調整的編輯介面尚未實作' : undefined}
                         aria-label={`編輯 ${ev.occurredOn} 的紀錄`}
                         onClick={() => setEditing(ev)}
                       >

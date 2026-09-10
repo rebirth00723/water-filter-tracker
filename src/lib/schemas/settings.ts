@@ -3,6 +3,7 @@ import { CYCLE_UNITS } from '@/lib/db/schema'
 import {
   dbId,
   hexColor,
+  optionalNtfyTopic,
   optionalDate,
   optionalPositiveInt,
   optionalText,
@@ -21,8 +22,11 @@ export const deviceFields = z.object({
   model: optionalText(60),
   /** 起算日備援 #3：種類與更換紀錄都沒有起算日時，用裝機日推算 */
   installedOn: optionalDate,
-  /** 留空＝沿用全域 topic。安全事件不綁設備，所以這裡只影響濾心提醒 */
-  ntfyTopic: optionalText(80),
+  /**
+   * 留空＝沿用全域 topic。安全事件不綁設備，所以這裡只影響濾心提醒。
+   * 用與發送端同一條規則驗證，否則存得進去但每次發送都必定失敗。
+   */
+  ntfyTopic: optionalNtfyTopic,
   active: z.boolean(),
 })
 

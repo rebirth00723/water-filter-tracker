@@ -8,6 +8,7 @@ import {
   deleteEventTx,
   getEvent,
   updateEventTx,
+  validateLines,
   type EventWriteInput,
 } from '@/lib/events-store'
 import { ActionError, authedAction } from '@/lib/safe-action'
@@ -46,6 +47,9 @@ export const addEvent = authedAction
     if (!device) throw new ActionError('找不到這台設備，可能已經被刪除')
 
     const input = toWriteInput(rest)
+    const problem = validateLines(deviceId, input.lines)
+    if (problem) throw new ActionError(problem)
+
     const id = createEventTx(deviceId, input)
 
     ctx.audit({
@@ -70,6 +74,9 @@ export const editEvent = authedAction
     if (!before) throw new ActionError('找不到這筆紀錄，可能已經被刪除')
 
     const input = toWriteInput(rest)
+    const problem = validateLines(before.deviceId, input.lines)
+    if (problem) throw new ActionError(problem)
+
     updateEventTx(id, input)
 
     ctx.audit({

@@ -71,6 +71,10 @@ const hourFmt = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit',
   hour12: false,
 })
+const minuteFmt = new Intl.DateTimeFormat('en-GB', {
+  timeZone: APP_TIME_ZONE,
+  minute: '2-digit',
+})
 // ↓ 刻意固定 UTC，見檔頭說明
 const zhFmt = new Intl.DateTimeFormat('zh-TW', { timeZone: 'UTC', dateStyle: 'medium' })
 
@@ -90,6 +94,16 @@ export function currentDate(now: Date = new Date()): string {
 /** 現在的當地小時（0-23），用於「每天幾點之後才送通知」。**伺服端專用** */
 export function currentHour(now: Date = new Date()): number {
   return Number(hourFmt.format(now))
+}
+
+/**
+ * 現在的當地分鐘（0-59）。**伺服端專用**
+ *
+ * 通知的發送時刻是 `<input type="time">`，使用者填得出 07:30 ——
+ * 只看小時的話那則通知會在 07:00 的掃描就送出，提早 30 分鐘。
+ */
+export function currentMinute(now: Date = new Date()): number {
+  return Number(minuteFmt.format(now))
 }
 
 /** YYYY-MM-DD -> UTC 午夜的 epoch ms。也是圖表的 X 值 */

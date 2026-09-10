@@ -83,18 +83,54 @@ function slot(purpose: Purpose, username: string) {
   return `${purpose}:${username}`
 }
 
+/**
+ * 登入挑戰可以同時存在數個。
+ *
+ * 產生登入挑戰的 GET 端點**不需要驗證**（那是它的用途），
+ * 所以單一槽位的話，任何人打一次那個端點就會把使用者進行中的登入挑戰洗掉 ——
+ * 使用者按了 Face ID 卻得到「挑戰已逾時」。
+ * 保留最近幾個，逾時的自然淘汰。
+ */
+const MAX_LOGIN_CHALLENGES = 8
+
 export function saveChallenge(purpose: Purpose, username: string, value: string): void {
-  store().set(slot(purpose, username), { value, at: Date.now() })
+  const s = store()
+  if (purpose === 'login') {
+    // 順手清掉過期的，避免這張表無限成長
+    const cutoff = Date.now() - CHALLENGE_TTL_MS
+    for (const [k, v] of s) {
+      if (k.startsWith('login:') && v.at < cutoff) s.delete(k)
+    }
+    const live = [...s.keys()].filter((k) => k.startsWith('login:'))
+    if (live.length >= MAX_LOGIN_CHALLENGES) s.delete(live[0])
+    s.set(`login:${username}:${value.slice(0, 12)}`, { value, at: Date.now() })
+    return
+  }
+  s.set(slot(purpose, username), { value, at: Date.now() })
 }
 
-/** 取出並**立即刪除** —— 挑戰是一次性的，重放必須失敗 */
-export function takeChallenge(purpose: Purpose, username: string): string | null {
+/**
+ * 取出並**立即刪除** —— 挑戰是一次性的，重放必須失敗。
+ *
+ * 登入時傳入 `expected`（客戶端回傳的挑戰值）以命中正確的那一個槽位；
+ * 註冊只有一個進行中的流程，所以用固定槽位即可。
+ */
+export function takeChallenge(
+  purpose: Purpose,
+  username: string,
+  expected?: string,
+): string | null {
   const s = store()
-  const key = slot(purpose, username)
+  const key =
+    purpose === 'login' && expected
+      ? `login:${username}:${expected.slice(0, 12)}`
+      : slot(purpose, username)
   const hit = s.get(key)
   s.delete(key)
   if (!hit) return null
   if (Date.now() - hit.at > CHALLENGE_TTL_MS) return null
+  // 比對完整的值，不只是被當作 key 的前 12 字元
+  if (expected !== undefined && hit.value !== expected) return null
   return hit.value
 }
 
