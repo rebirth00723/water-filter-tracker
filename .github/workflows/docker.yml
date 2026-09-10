@@ -46,7 +46,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           # amd64 是主要目標（多數 NAS 與 VPS）；arm64 一併出，成本不高，
