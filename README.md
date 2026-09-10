@@ -1,52 +1,47 @@
-# Water Filter Tracker
+# 淨水器耗材與水質記錄系統
 
-Self-hosted, mobile-first tracker for RO water purifier consumables and water quality.
+自架、手機優先的 RO 淨水器耗材與水質記錄工具。
 
-Records filter purchases and replacements with cost, logs raw and pure TDS (ppm) readings,
-overlays both on a shared timeline so filter degradation becomes visible, and pushes a
-reminder through [ntfy](https://ntfy.sh) as a replacement date approaches.
+記錄耗材新購與更換（含成本）、記錄原水與純水的 TDS（ppm），把兩者疊在同一條時間軸上
+讓濾心衰退看得出來，並在接近更換日時透過 [ntfy](https://ntfy.sh) 主動推播。
 
-[繁體中文說明](./README.zh-TW.md)
+> 🌐 **English speakers**: an [English version](./README.en.md) is available.
+> It is kept in sync but this Chinese README is the primary one.
 
 ---
 
-## Why this exists
+## 為什麼做這個
 
-Filter replacement dates live in your head, so you forget them. And because raw water
-quality shifts with the season, the pure-water number alone doesn't tell you whether the
-membrane is degrading — 12 ppm in summer and 18 ppm in winter can be the same healthy
-filter. What you actually need is the rejection rate over time, with replacement events
-marked on the same axis.
+濾心的更換日期靠記憶，所以一定會忘。而原水本身會隨季節與水源變動，
+**單看純水的絕對值會誤判** —— 夏天 12 ppm、冬天 18 ppm 可能是同一支健康的濾心。
+真正要看的是去除率隨時間的變化，而且要把更換事件標在同一條軸上。
 
-That's the whole app: two numbers, a list of what you changed, and a chart that puts them
-together.
+這個 App 就只做這件事：兩個數字、一份換了什麼的清單，以及一張把它們放在一起的圖。
 
-## Features
+## 功能
 
-**Consumables** — Log a replacement in about 30 seconds while standing at the sink.
-Template chips fill the whole list from your last replacement; a two-stage picker shows
-each filter stage with its stock and overdue days, so the picker doubles as a to-do list.
-Purchases track cost and vendor.
+**耗材紀錄** —— 站在水槽邊 30 秒內記完一次更換。範本 chip 一鍵套用上次的組合；
+兩階挑選器把每一道的庫存與逾期天數直接標在上面，所以挑選器本身就是待辦清單。
+新購另記單價與購買來源。
 
-**Water quality** — Raw and pure ppm with a live rejection-rate readout. Readings entered
-during a replacement are owned by that event: edit the event's date and the chart point
-moves with it.
+**水質紀錄** —— 原水與純水 ppm，即時顯示去除率。更換當天填的 PPM 由那筆更換事件擁有：
+改事件日期，圖上的點會跟著移動。
 
-**Report** — A ppm line chart with a replacement swimlane below it, sharing one time axis.
-Tap anywhere to snap to the nearest date and see both the readings and everything replaced
-that day. Pinch to zoom five years of data on a phone.
+**報表** —— PPM 折線圖，下方是各種類的更換泳道，兩者共用同一條時間軸。
+點圖上任何位置都會吸附到最近的日期，同時列出當天的 PPM 與所有更換項目。
+手機上兩指縮放，五年的資料也看得動。
 
-**Reminders** — Per-rule advance notices (14 days, 3 days, day-of) and repeating overdue
-notices, each with its own send time, message template, and priority. Filter reminders and
-security events go to two separate ntfy topics so the latter isn't buried by the former.
+**提醒** —— 提前提醒（14 天、3 天、當天）與逾期重複提醒，每一條各自可設發送時刻、
+訊息樣板與優先度。濾心提醒與安全事件走兩個不同的 ntfy topic，
+後者才不會被前者淹沒。
 
-**Multiple devices** — Each purifier gets its own URL (`/d/1`, `/d/2`) and its own
-downloadable QR code with the device name burned into the image. Stick one on each machine.
+**多台設備** —— 每台淨水器有自己的網址（`/d/1`、`/d/2`）與可下載的專屬 QR Code，
+圖片裡燒進設備名稱。一台貼一張。
 
-**Login** — Password always; [passkey](#passkeys) as an optional shortcut where HTTPS is
-available. Data lives in a single SQLite file you can export as JSON and import elsewhere.
+**登入** —— 密碼永遠要求；有 HTTPS 時可加上 [passkey](#passkey) 作為快捷。
+資料是單一 SQLite 檔，可匯出成 JSON 搬到別台機器。
 
-## Quick start
+## 快速開始
 
 ```bash
 mkdir water-filter-tracker && cd water-filter-tracker
@@ -54,23 +49,21 @@ curl -O https://raw.githubusercontent.com/rebirth00723/water-filter-tracker/main
 docker compose up -d
 ```
 
-Then open `http://<host>:8085` and set a username and password. That's the whole setup —
-no token, no CLI step, no config file to edit first.
+然後開 `http://<主機>:8085`，設定使用者名稱與密碼。設定就這樣結束了 ——
+沒有 token、沒有 CLI 步驟、也不必先改任何設定檔。
 
 > [!IMPORTANT]
-> **Finish that first-run setup before exposing the service to the internet.** The setup
-> page is deliberately unprotected — whoever reaches it first claims the account. If the
-> service is only on your LAN this doesn't matter; if it's behind a tunnel, set the password
-> before you point a public hostname at it.
+> **請在把服務對外開放之前完成首次設定。** 初始化頁面刻意沒有保護 ——
+> 誰先開到誰就佔到那個帳號。只在區網用的話這不影響；
+> 若要走 tunnel，請先設好密碼再把公開網址指過來。
 
-Everything else — the outward URL, ntfy connection, notification rules — is configured in
-the web UI. There are **no required environment variables**.
+其餘設定（對外網址、ntfy 連線、通知規則）全部在網頁上填。**沒有任何必填的環境變數。**
 
-## Two ways to run it
+## 兩種部署形態
 
-### (a) LAN only
+### (a) 只在區網用
 
-No domain, no certificate, no reverse proxy. Publish the port and you're done:
+不需要網域、不需要憑證、不需要反向代理。把埠發布出來就結束了：
 
 ```yaml
 services:
@@ -80,252 +73,235 @@ services:
     volumes: ['./data:/data']
 ```
 
-Everything works — recording, reports, reminders, QR codes (fill in
-`http://192.168.x.x:8085` as the outward URL in Admin). The only feature you can't use is
-passkeys, because browsers don't expose WebAuthn over plain HTTP. Password login works
-fine.
+功能完整 —— 記錄、報表、提醒、QR Code（在管理中心把對外網址填成
+`http://192.168.x.x:8085` 即可）。唯一不能用的是 passkey，
+因為瀏覽器在純 HTTP 下不提供 WebAuthn。密碼登入照常。
 
-### (b) Remote access
+### (b) 要遠端存取
 
-You need HTTPS with a real domain name. Point a tunnel or reverse proxy at the container
-and set the outward URL in Admin (or via `PUBLIC_URL`).
+需要帶網域名稱的 HTTPS。把 tunnel 或反向代理指向這個容器，
+並在管理中心（或用 `PUBLIC_URL`）填入對外網址。
 
-**The HTTPS requirement is the browser's, not this project's.** WebAuthn does not exist in
-non-secure contexts, and a WebAuthn Relying Party ID must be a domain name — IP addresses
-are invalid per spec. If you want passkeys, you need a certificate. Ways to get one without
-buying anything:
+**HTTPS 這個要求是瀏覽器的，不是本專案的。** WebAuthn 在非安全內容下根本不存在，
+而 WebAuthn 的 RP ID 依規範必須是網域名稱 —— IP 位址不合法。
+想用 passkey 就一定要有憑證。不必花錢的幾條路：
 
-| Situation | Approach |
+| 情況 | 做法 |
 |---|---|
-| You use Tailscale | `tailscale cert <host>.<tailnet>.ts.net` — free, auto-renewing |
-| You have a public domain | Cloudflare Tunnel, or Caddy/Traefik with Let's Encrypt |
-| Internal-only domain | Let's Encrypt via DNS-01 (no inbound port needed) |
-| No domain at all | [mkcert](https://github.com/FiloSottile/mkcert) internal CA — you must install the root cert on each device |
+| 你有用 Tailscale | `tailscale cert <host>.<tailnet>.ts.net` —— 免費、自動續約 |
+| 你有公開網域 | Cloudflare Tunnel，或 Caddy／Traefik 配 Let's Encrypt |
+| 只有內部網域 | Let's Encrypt 走 DNS-01（不需要開對外埠） |
+| 完全沒有網域 | [mkcert](https://github.com/FiloSottile/mkcert) 內部 CA —— 但每台裝置都要裝根憑證 |
 
-**Keep the LAN port published as well.** Password login works over plain HTTP, so if the
-tunnel goes down you can still reach the app and record a replacement. That's the practical
-payoff of making password the floor rather than passkey-only.
+**區網的埠請照樣發布出來。** 密碼登入在純 HTTP 下可用，所以 tunnel 掛掉時
+你仍然進得去、記得了。這正是「把密碼當地板而不是只做 passkey」的實際回報。
 
-If you use a reverse proxy, **do not rewrite the `Host` header** — Next.js compares
-`Origin` against `Host` to block cross-site writes, and rewriting Host makes that check
-fail. (In Cloudflare Tunnel, this is the `httpHostHeader` option; leave it unset.)
+用反向代理的話，**不要改寫 `Host` header** —— Next.js 靠比對 `Origin` 與 `Host`
+來擋跨站寫入，改寫 Host 會讓那個檢查失敗。（Cloudflare Tunnel 裡是
+`httpHostHeader` 這個選項，留空即可。）
 
-## QR codes
+## QR Code
 
-Settings → Devices → pick a device → **Download PNG**.
+設定 → 設備 → 選一台 → **下載 PNG**。
 
-The image contains the QR plus the device name and URL. Print one, stick it on the machine,
-and scanning it opens that specific purifier's page — no URL to remember, no device to
-switch, no app to install. With three purifiers this is the difference between the tool
-getting used and not.
+圖片裡含 QR、設備名稱與網址。印一張貼在機器上，掃了就直接開那一台的記錄頁 ——
+不必記網址、不必切換設備、也不必裝 App。有三台淨水器的時候，
+這是「這個工具會被用」與「不會被用」的差別。
 
-The URL is composed on the server from your configured outward URL, never derived from
-`window.location`. That's deliberate: if you open Settings from a LAN IP, a
-browser-derived QR would encode an address that fails from outside.
+網址是伺服器用你設定的對外網址組好的，**不是從 `window.location` 推導**。
+這是刻意的：如果你從區網 IP 開設定頁，從瀏覽器推導出來的 QR 掃了會進不去。
 
-## Notifications
+## 通知
 
-Point it at any ntfy server (self-hosted or ntfy.sh) in Admin. Leave it blank and
-notifications are simply off; everything else still works.
+在管理中心指向任何 ntfy 伺服器（自架或 ntfy.sh）。留空就是關閉通知，其餘功能照常。
 
-Two topics, one credential:
+兩個 topic、共用一組認證：
 
-- **Filter reminders** — "the first stage is due in 14 days"
-- **Security events** — a passkey was registered or revoked
+- **濾心提醒** —— 「第一道再 14 天就該換了」
+- **安全事件** —— 有 passkey 被註冊或撤銷
 
-They're separate because a filter reminder every few weeks would bury the one message you
-need to see immediately.
+分開的理由是：每隔幾週一次的濾心提醒會把那則你需要立刻看到的訊息淹掉。
 
-### Is the topic name a secret?
+### topic 名稱算不算密碼？
 
-**It depends on your ntfy server, and the advice is opposite in the two cases:**
+**取決於你的 ntfy 伺服器設定，而且兩種情況的建議剛好相反：**
 
-| Server config | Topic = password? | What to do |
+| 伺服器設定 | topic ＝密碼？ | 該怎麼做 |
 |---|---|---|
-| `ntfy.sh`, or self-hosted with `auth-default-access: read-write` | **Yes.** Anyone who knows the topic can subscribe and publish. | Add a long random suffix: `water-filter-a8f3d91c` |
-| Self-hosted with `auth-default-access: deny-all` | **No.** The name is useless without a token or account authorized for it. | Use a readable name |
+| `ntfy.sh`，或自架但 `auth-default-access: read-write` | **是。** 知道 topic 就能訂閱與發布 | 加一段長的隨機後綴：`water-filter-a8f3d91c` |
+| 自架且 `auth-default-access: deny-all` | **不是。** 沒有被授權的 token 或帳號，知道名稱也沒用 | 取人看得懂的名字 |
 
-Prefer an access token over a username/password: a leaked token can be revoked on its own,
-whereas a leaked password means changing the whole ntfy account.
+**建議用 access token 而不是帳號密碼**：token 外洩時可以單獨撤銷那一把，
+而帳密外洩要改整個 ntfy 帳號的密碼，會影響其他用途。
 
-Credentials are stored in the database **in plaintext**. The only key available to encrypt
-them sits in the same directory as the database, so anyone who can read one can read the
-other — encrypting would be theatre. They're excluded from JSON export for the same reason
-they'd otherwise leak.
+認證存在資料庫裡**是明文**。能拿來加密它的金鑰就在資料庫同一個目錄下，
+拿得到其中一個的人通常兩個都拿得到 —— 加密只是心理安慰。
+它們也因為同樣的理由被排除在 JSON 匯出之外。
 
-## Configuration
+## 設定項目
 
-Every setting has a UI equivalent. Environment variables exist for people who prefer
-declarative config, and **they take precedence** — a field controlled by an env var shows
-up read-only in Admin, labelled as such, rather than letting you edit a value that won't
-take effect.
+每一項都有對應的網頁欄位。環境變數是給偏好宣告式設定的人用的，而且**優先於網頁設定** ——
+有設環境變數的欄位在管理中心會顯示為唯讀並標示「由環境變數控制」，
+而不是讓你填了卻不生效。
 
-| Variable | Default | Notes |
+| 變數 | 預設 | 說明 |
 |---|---|---|
-| `PUBLIC_URL` | UI | Outward URL. **Required for passkeys, and must be HTTPS with a domain name.** Also used for QR codes and notification click-through. Changing it invalidates every existing passkey |
-| `PORT` | `8085` | The only outward port |
-| `BASE_PATH` | — | Mount the whole app under a sub-path (e.g. `/water`) when the path collides on a shared domain. `PUBLIC_URL` must include the same prefix |
-| `TEMP_PASSWORD` | — | Rescue password. **Leaving it set is a permanent backdoor** — see [Security](#security) |
+| `PUBLIC_URL` | 網頁填 | 對外網址。**啟用 passkey 時必填，且必須是帶網域名稱的 https。** QR Code 與通知的點擊連結也用它。改動會讓所有既有 passkey 失效 |
+| `PORT` | `8085` | 唯一的對外埠 |
+| `BASE_PATH` | 空 | 把整個 App 掛在子路徑下（如 `/water`），用於同網域上路徑撞名。設了它 `PUBLIC_URL` 也要含相同前綴 |
+| `TEMP_PASSWORD` | 空 | 救援用臨時密碼。**留著等同永久後門** —— 見[安全性](#安全性) |
 | `DATABASE_PATH` | `/data/app.sqlite3` | |
-| `SESSION_SECRET` | auto | Generated at `/data/session.key` (mode 0600) on first start. Set it only if you want to manage it yourself |
+| `SESSION_SECRET` | 自動 | 首次啟動自動產生於 `/data/session.key`（權限 0600）。想自己管理才填 |
 | `SESSION_MAX_AGE_DAYS` | `30` | |
-| `COOKIE_SECURE` | `auto` | `auto` follows `X-Forwarded-Proto`. A `Secure` cookie is silently dropped over plain HTTP, which looks like "login succeeds then immediately fails" |
-| `NTFY_URL` | UI | Base URL only, **no topic** — this app posts to ntfy's JSON endpoint at the root path |
-| `NTFY_TOPIC_FILTER` / `NTFY_TOPIC_SECURITY` | UI | |
-| `NTFY_TOKEN` | UI | Or `NTFY_USER` + `NTFY_PASSWORD`. Token wins if both are set |
-| `TZ` | system, `Asia/Taipei` in the image | IANA name. Affects what counts as "today", due-date maths, and notification send times. A typo falls back to the system zone and logs a line rather than refusing to start |
-| `SESSION_KEY_PATH` | next to the database | Where the auto-generated session key lives |
-| `REAL_IP_HEADER` | auto | Names a single header for the visitor IP. **Only affects log accuracy** — authorization never looks at IPs or headers |
+| `COOKIE_SECURE` | `auto` | `auto` 依 `X-Forwarded-Proto` 判斷。帶 `Secure` 的 cookie 在純 HTTP 下會被瀏覽器靜默丟棄，症狀是「登入成功但立刻被踢回登入頁」 |
+| `NTFY_URL` | 網頁填 | 只填 base URL，**結尾不要帶 topic** —— 本 App 用 ntfy 的 JSON 端點（POST 到根路徑） |
+| `NTFY_TOPIC_FILTER` / `NTFY_TOPIC_SECURITY` | 網頁填 | |
+| `NTFY_TOKEN` | 網頁填 | 或 `NTFY_USER` + `NTFY_PASSWORD`。兩者都設時 token 優先 |
+| `TZ` | 系統時區，映像內預設 `Asia/Taipei` | IANA 名稱。影響「今天是哪一天」、到期日推算與通知發送時刻。打錯字會退回系統時區並在日誌留一行，不會讓服務起不來 |
+| `SESSION_KEY_PATH` | 資料庫旁 | 自動產生的 session 金鑰檔要放哪 |
+| `REAL_IP_HEADER` | 自動 | 指定單一 header 取得訪客 IP。**只影響日誌準確度** —— 授權完全不看 IP 或 header |
 | `LOG_LEVEL` | `info` | |
 
-Any variable also accepts a `_FILE` suffix pointing at a file (for Docker secrets):
-`NTFY_PASSWORD_FILE=/run/secrets/ntfy`.
+任何變數都可以加 `_FILE` 後綴指向檔案（給 Docker secret 用）：
+`NTFY_PASSWORD_FILE=/run/secrets/ntfy`。
 
-Running as a non-root user? The image doesn't hardcode `USER`, because every host has a
-different uid (1000 on most Linux, 1026 on some NAS boxes, different again in LXC).
-Set Docker's own field instead:
+要以非 root 執行？映像**刻意不寫死 `USER`**，因為每台主機的 uid 都不一樣
+（一般 Linux 常是 1000、某些 NAS 是 1026、LXC 裡又不同）。
+用 Docker 自己的欄位：
 
 ```yaml
-user: "1000:1000"   # your `id -u`:`id -g`
+user: "1000:1000"   # 你的 `id -u`:`id -g`
 ```
 
-## Data and backups
+## 資料與備份
 
-Everything is one file: `./data/app.sqlite3`.
+全部就是一個檔：`./data/app.sqlite3`。
 
-There is **no built-in backup feature** — snapshots, rsync and Restic are more reliable
-than anything the app could do, and you probably already run one of them.
+**刻意不內建備份功能** —— NAS 快照、rsync、Restic 都比 App 自己做的可靠，
+而你大概已經在用其中一個了。
 
 > [!WARNING]
-> **Do not copy `app.sqlite3` while the container is running.** WAL mode keeps recent
-> transactions in the `-wal` sidecar, so the copy can be missing data. Either stop the
-> container first, or use `sqlite3 app.sqlite3 ".backup out.sqlite3"`.
+> **容器執行中不要直接複製 `app.sqlite3`。** WAL 模式下最近的交易還在 `-wal` 裡，
+> 複製出來的檔案可能缺資料。請先停容器再複製，或用
+> `sqlite3 app.sqlite3 ".backup out.sqlite3"`。
 
-Also: **never put the database on NFS or SMB.** SQLite's file locking is unreliable there
-and will silently corrupt data.
+另外：**絕對不要把資料庫放在 NFS／SMB 上。** SQLite 的檔案鎖在其上不可靠，
+會靜默損毀資料。
 
-For moving to another machine, Settings → Export/Import produces a single human-readable
-JSON file. It deliberately excludes credentials, passkeys, the audit log and the ntfy
-connection: passkeys are bound to a domain and would be useless anyway, an importable
-credentials file would be a backdoor, and an audit log from another machine isn't evidence
-of anything.
+要搬到另一台機器的話，設定 → 匯出與匯入會產生一個人類可讀的 JSON。
+它刻意不含登入憑證、passkey、操作紀錄與 ntfy 連線：passkey 綁定網域，
+搬過去也失效；能匯入他人憑證檔的功能等於一條後門；
+而別台機器的操作紀錄不能證明任何事。
 
-## Security
+## 安全性
 
-What this project does:
+這個專案做了什麼：
 
-- Password login with scrypt hashing, per-password salt, constant-time comparison
-- Rate limiting keyed on the account (2 per 30s, 4 failures → 10 minute lock)
-- Every login failure returns an identical response — same status, message, URL, and
-  timing — so the response can't be used to probe for a valid username
-- Session tokens signed with a per-deployment key generated on first start
-- Content Security Policy with a per-request nonce, `frame-ancestors 'none'`,
-  `Referrer-Policy`, `X-Content-Type-Options`
-- `Origin`/`Host` comparison on every write (Next.js Server Actions do this natively)
-- Audit log of every login and data change, with before/after values
+- 密碼以 scrypt 雜湊，每組密碼獨立 salt，比對用常數時間
+- 限流綁帳號（30 秒 2 次、累計 4 次鎖 10 分鐘）
+- **所有登入失敗回傳完全相同的回應** —— 狀態碼、訊息、網址、耗時都一樣，
+  所以無法用回應去探測某個帳號是否存在
+- session 以每份部署各自產生的金鑰簽署
+- CSP 帶 per-request nonce、`frame-ancestors 'none'`、`Referrer-Policy`、
+  `X-Content-Type-Options`
+- 每個寫入都比對 `Origin` 與 `Host`（Next.js 的 Server Action 原生就做）
+- 每一次登入與資料異動都寫操作紀錄，**含變更前後值**
 
-What it deliberately does not do, and why:
+刻意不做的，以及原因：
 
-- **No HSTS.** A long `max-age` is irreversible and would lock out anyone self-hosting over
-  plain HTTP on their LAN.
-- **The first-run setup page is unprotected.** Whether the service faces the internet is the
-  operator's decision; accidental exposure before setup is explicitly out of scope. Finish
-  setup before exposing it.
-- **No vendor-specific auth** (e.g. Cloudflare Access). Tying an open-source project to one
-  provider defeats the point.
+- **不做 HSTS。** 長 `max-age` 一旦送出就不可逆，會把在區網用純 HTTP 自架的人鎖死。
+- **首次設定頁沒有保護。** 服務要不要對外是部署者的決定；
+  設定完成前的意外暴露明確不在本設計的防護範圍內。請先設定完再對外。
+- **不用廠商專屬的驗證**（例如 Cloudflare Access）。把開源專案綁在單一廠商上
+  就失去意義了。
 
-Things worth knowing:
+值得知道的：
 
-- **`TEMP_PASSWORD` left in your config is a permanent backdoor.** It exists so that
-  changing your password and then forgetting it doesn't lock you out. Logging in with it
-  forces a password change immediately, and the login page keeps warning you on *every*
-  login for as long as it's set. Remove it and restart when you're done.
-- **Passkeys are bound to the domain.** Change `PUBLIC_URL` and every registered passkey
-  stops working; you re-register from the same page.
-- **Passkeys can't be used over plain HTTP.** That's the browser, not this app. Password
-  login always works, which is why it's the floor rather than an afterthought.
-- Regenerating the session key in Admin logs out every device. **Passkeys are unaffected**
-  and don't need re-registering.
+- **`TEMP_PASSWORD` 留在設定裡就是永久後門。** 它存在的理由是避免改了密碼又忘記
+  而完全進不去。用它登入會立刻強制修改密碼，而且只要它還在，
+  登入頁**每一次**都會提醒你。用完請移除並重新啟動。
+- **passkey 綁定網域。** 改了 `PUBLIC_URL` 之後所有已註冊的 passkey 都會失效，
+  在同一個頁面重新註冊即可。
+- **passkey 在純 HTTP 下不能用。** 那是瀏覽器的限制，不是這個 App 的。
+  密碼登入永遠可用，這正是把它當地板而不是附加品的原因。
+- 在管理中心重新產生 session 金鑰會登出所有裝置。**passkey 不受影響**，不必重新註冊。
 
-### Passkeys
+### passkey
 
-Password first, passkey as an upgrade — never passkey-only. A passkey is bound to a device
-and a domain, so a lost phone, a domain change, or a plain-HTTP fallback all leave you with
-the password as the only way in.
+密碼是地板、passkey 是升級，**絕不會只有 passkey**。
+passkey 綁定裝置與網域，所以手機遺失、換網域、或退回純 HTTP 時，
+密碼是唯一還進得去的路。
 
-Registration involves **no QR code and no one-time token**: log in with your password, open
-Settings → Quick login, tap once, use Face ID. Being logged in with a password *is* the
-authorization. The server stores only public keys, so a database leak can't be used to log
-in.
+註冊流程**沒有 QR Code、沒有一次性代碼**：用密碼登入，開設定 → 快速登入，
+按一下，Face ID。「已經用密碼登入」本身就是授權。
+伺服器只存公鑰，所以資料庫外洩也無法用來登入。
 
-Enable it globally in Admin (which requires HTTPS with a domain, and a password already
-set), then register each device from Settings → Quick login. Admin also holds the full
-credential list with emergency revoke, for when a phone goes missing.
+在管理中心啟用（需要帶網域的 HTTPS，且已設定密碼），
+再到設定 → 快速登入逐台註冊。管理中心另有完整的憑證清單與緊急撤銷，
+留給手機遺失那類情況。
 
-## Development
+## 開發
 
 ```bash
 npm install
 npm run dev              # http://localhost:3000
 ```
 
-Migrations and seed data run automatically at server start
-(`src/instrumentation.ts` → `src/lib/boot.ts`). After changing `src/lib/db/schema.ts`:
+Migration 與種子資料會在伺服器啟動時自動執行
+（`src/instrumentation.ts` → `src/lib/boot.ts`）。改了 `src/lib/db/schema.ts` 之後：
 
 ```bash
-npm run db:generate      # writes a new migration to drizzle/
+npm run db:generate      # 產生新的 migration 到 drizzle/
 ```
 
 ```bash
 npm test                 # vitest
-npm run typecheck        # these are separate on purpose — vitest uses esbuild
-npm run build            # and does NOT typecheck
+npm run typecheck        # 這兩件事刻意分開 —— vitest 走 esbuild，
+npm run build            # **不做型別檢查**，所以「測試全過」不等於「型別正確」
 ```
 
-### Layout
+### 目錄結構
 
 ```
 src/
   app/
-    (app)/               authenticated shell
-      d/[deviceId]/      per-device: home, consumables, water, report
-      settings/          devices, notifications, data, quick login, audit
-      admin/             outward URL, ntfy, session key, passkey toggle
-    api/                 auth, passkey, export, import, health
+    (app)/               需要授權的外殼
+      d/[deviceId]/      每台設備：首頁、耗材、水質、報表
+      settings/          設備、通知、匯出匯入、快速登入、操作紀錄
+      admin/             對外網址、ntfy、session 金鑰、passkey 開關
+    api/                 auth、passkey、export、import、health
     setup|login|change-password/
   lib/
-    db/                  Drizzle schema, migrations, seed
-    auth/                password, session, rate limit, passkey
-    notify/              ntfy client, sweep, croner schedule
-    schemas/             zod — shared by client forms and server actions
+    db/                  Drizzle schema、migration、種子
+    auth/                密碼、session、限流、passkey
+    notify/              ntfy 客戶端、掃描、croner 排程
+    schemas/             zod —— 客戶端表單與 Server Action 共用同一份
   components/
 ```
 
-### Conventions worth knowing before you change things
+### 動手改之前值得知道的慣例
 
-- **User-visible dates are `TEXT` in `YYYY-MM-DD`, never DateTime.** These are calendar
-  dates, not instants. Lexicographic order equals chronological order (so `MAX()`,
-  `ORDER BY` and `BETWEEN` work directly), they cross the server/client boundary without
-  serialization, and there's no timezone off-by-one waiting to happen.
-- **Pages are Server Components that query SQLite directly.** There is no read API layer;
-  that's the biggest simplification this stack allows. Client Components are leaves.
-- **Writes go through Server Actions**, and every one re-checks authorization — a Server
-  Action is a public HTTP endpoint, so the page that rendered the form is not a boundary.
-- **One zod schema per shape, shared** by react-hook-form and the Server Action. Client and
-  server validation cannot drift.
-- **`foreign_keys = ON`** is set per connection. SQLite defaults it off, and without it
-  every cascade and restrict in the schema is decorative.
-- Modules that touch the database import `'server-only'`. Anything a Client Component needs
-  lives in a separate pure module (`device-path.ts`, `ppm.ts`, `audit-groups.ts`).
+- **使用者可見的日期一律是 `TEXT` 的 `YYYY-MM-DD`，不用 DateTime。**
+  那些是「日曆上的日期」而非時間點。字典序等於時序（所以 `MAX()`、`ORDER BY`、
+  `BETWEEN` 直接可用）、跨 server/client 邊界不需序列化，
+  也沒有時區差一天的問題在等著。
+- **每個頁面都是 Server Component 直接查 SQLite。** 沒有讀取用的 API 層 ——
+  那是這個技術棧最大的簡化。Client Component 只作為葉節點。
+- **寫入一律走 Server Action，而且每一個都自己重新驗授權** ——
+  Server Action 是公開的 HTTP 端點，渲染表單的那個頁面不是邊界。
+- **一種形狀一份 zod schema，客戶端與伺服端共用。** 兩邊的驗證規則不可能漂移。
+- **`foreign_keys = ON`** 是每條連線都要下的。SQLite 預設是關的，
+  不開的話 schema 裡所有的 cascade 與 restrict 都只是裝飾。
+- 碰資料庫的模組都 `import 'server-only'`。Client Component 需要的東西
+  住在獨立的純模組裡（`device-path.ts`、`ppm.ts`、`audit-groups.ts`）。
 
-## Contributing
+## 參與貢獻
 
-Issues and pull requests are welcome. Bug reports are most useful with the failing input
-and what you expected instead.
+歡迎 issue 與 pull request。回報 bug 時，附上會出錯的輸入與你預期的結果最有幫助。
 
-If you're changing behaviour, please include a test. `npm test && npm run typecheck` should
-both pass — they check different things.
+若是改動行為，請附上測試。`npm test` 與 `npm run typecheck` 都要過 ——
+它們檢查的是不同的東西。
 
-## License
+## 授權
 
 [MIT](./LICENSE)
