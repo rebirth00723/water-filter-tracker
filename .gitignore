@@ -30,8 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files —— .env.example 要留著，README 叫使用者去看它
+.env
+.env.*
+!.env.example
 
 # vercel
 .vercel
@@ -39,6 +41,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 開發時的工作計畫，含私人基礎設施細節（網域、內網位址、主機名稱），
+# 刻意不進公開 repo
+/PLAN.md
 
 # --- 本專案 ---
 # 機密：ntfy 的 token 或密碼（NTFY_PASSWORD_FILE 指向的檔案）放在這裡

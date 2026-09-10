@@ -63,7 +63,7 @@ describe('rpConfig —— RP ID 必須是網域名稱', () => {
   })
 
   it('IP 位址不行 —— RP ID 不接受 IP', () => {
-    for (const url of ['https://192.168.0.30', 'https://192.168.0.30:8085', 'https://[::1]']) {
+    for (const url of ['https://192.0.2.10', 'https://192.0.2.10:8085', 'https://[::1]']) {
       setUrl(url)
       expect(pk.rpConfig()).toBeNull()
     }
