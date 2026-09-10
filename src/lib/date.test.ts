@@ -17,10 +17,20 @@ describe('date', () => {
     expect(currentDate()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
-  it('currentDate 用設定的時區而非 UTC', () => {
+  it('currentDate 用設定的時區而非 UTC', async () => {
+    /*
+     * **明確設定 TZ 再載入模組**，不依賴跑測試那台機器的時區。
+     *
+     * APP_TIME_ZONE 在未設 TZ 時會跟隨系統時區 —— 這對本機開發是對的行為，
+     * 但會讓這個測試在開發機（台北）過、在 CI（UTC）掛。
+     * 實際發生過，而且是 CI 抓到的。
+     */
+    vi.resetModules()
+    process.env.TZ = 'Asia/Taipei'
+    const { currentDate: inTaipei } = await import('./date')
     // 2026-09-05 17:30 UTC = 2026-09-06 01:30 台北
-    expect(currentDate(new Date('2026-09-05T17:30:00Z'))).toBe('2026-09-06')
-    expect(currentDate(new Date('2026-09-05T15:59:00Z'))).toBe('2026-09-05')
+    expect(inTaipei(new Date('2026-09-05T17:30:00Z'))).toBe('2026-09-06')
+    expect(inTaipei(new Date('2026-09-05T15:59:00Z'))).toBe('2026-09-05')
   })
 
   it('addDays 跨月與跨年', () => {
