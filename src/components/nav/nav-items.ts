@@ -42,7 +42,21 @@ export function isNavActive(pathname: string, item: NavItem): boolean {
  * 所以從切換器跳到另一台設備的那一次請求，伺服端讀到的 cookie 還是舊值 ——
  * 若用它產生分頁連結，畫面顯示的是設備 2 而分頁卻指向設備 1。
  * 網址是當下唯一可信的來源，只有網址裡沒有設備時（例如設定頁）才退回 cookie 的值。
+ *
+ * **但網址裡的 id 必須真的存在。** 打開一個已刪除設備的舊連結會走到 404，
+ * 而那一頁的導覽列仍然由這個函式產生 —— 只看網址的話，五個分頁有四個
+ * 指回同一個死掉的 id，使用者每按一次就再撞一次 404。
+ * `knownDeviceIds` 讓它在那種時候退回備援值，把導覽列變回出口。
+ *
+ * 判準是「存在」而不是「啟用中」：停用的設備仍然可以瀏覽（見 (app)/layout.tsx），
+ * 用啟用清單判斷會把那條路一起堵死。
  */
-export function navDeviceId(pathname: string, fallback: number | null): number | null {
-  return deviceIdFromPath(pathname) ?? fallback
+export function navDeviceId(
+  pathname: string,
+  fallback: number | null,
+  knownDeviceIds: readonly number[],
+): number | null {
+  const fromPath = deviceIdFromPath(pathname)
+  if (fromPath !== null && knownDeviceIds.includes(fromPath)) return fromPath
+  return fallback
 }

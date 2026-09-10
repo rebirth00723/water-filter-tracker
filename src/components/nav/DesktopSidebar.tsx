@@ -5,9 +5,15 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { NAV_ITEMS, isNavActive, navDeviceId, navHref } from './nav-items'
 
-export function DesktopSidebar({ fallbackDeviceId }: { fallbackDeviceId: number | null }) {
+export function DesktopSidebar({
+  fallbackDeviceId,
+  knownDeviceIds,
+}: {
+  fallbackDeviceId: number | null
+  knownDeviceIds: readonly number[]
+}) {
   const pathname = usePathname()
-  const deviceId = navDeviceId(pathname, fallbackDeviceId)
+  const deviceId = navDeviceId(pathname, fallbackDeviceId, knownDeviceIds)
 
   return (
     <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r border-border bg-card md:flex">

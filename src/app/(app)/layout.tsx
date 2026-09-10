@@ -2,7 +2,7 @@ import { BottomTabBar } from '@/components/nav/BottomTabBar'
 import { DesktopSidebar } from '@/components/nav/DesktopSidebar'
 import { Toaster } from '@/components/ui/Toaster'
 import { requireUser } from '@/lib/auth/require'
-import { resolveDeviceId } from '@/lib/devices'
+import { listDeviceIds, resolveDeviceId } from '@/lib/devices'
 
 /**
  * 這個 layout 底下的所有頁面都需要授權，而授權要讀資料庫與 cookie ——
@@ -22,12 +22,19 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
    */
   const fallbackDeviceId = await resolveDeviceId()
 
+  /*
+   * 導覽列還要知道「網址裡那個 id 存不存在」——
+   * 打開已刪除設備的舊連結會走到 404，而那一頁的導覽列若只看網址，
+   * 五個分頁有四個指回同一個死掉的 id。
+   */
+  const knownDeviceIds = listDeviceIds()
+
   return (
     <div className="flex min-h-dvh">
-      <DesktopSidebar fallbackDeviceId={fallbackDeviceId} />
+      <DesktopSidebar fallbackDeviceId={fallbackDeviceId} knownDeviceIds={knownDeviceIds} />
       {/* pb-20 讓最後一列不會被底部導覽列蓋住 */}
       <main className="min-w-0 flex-1 pb-20 md:pb-0">{children}</main>
-      <BottomTabBar fallbackDeviceId={fallbackDeviceId} />
+      <BottomTabBar fallbackDeviceId={fallbackDeviceId} knownDeviceIds={knownDeviceIds} />
       <Toaster />
     </div>
   )

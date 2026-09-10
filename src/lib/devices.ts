@@ -38,6 +38,16 @@ export function listActiveDevices(): Device[] {
     .all()
 }
 
+/**
+ * 所有存在的設備 id（含停用）。
+ *
+ * 給導覽列判斷「網址裡這個 id 是不是真的」用 —— 停用的設備仍然可以瀏覽，
+ * 所以這裡不能只回啟用中的。只取 id，不把整列資料送進客戶端 bundle。
+ */
+export function listDeviceIds(): number[] {
+  return db.select({ id: devices.id }).from(devices).all().map((r) => r.id)
+}
+
 export function getDevice(id: number): Device | undefined {
   return db.select().from(devices).where(eq(devices.id, id)).get()
 }

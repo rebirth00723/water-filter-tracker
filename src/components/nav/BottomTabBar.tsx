@@ -5,9 +5,15 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { NAV_ITEMS, isNavActive, navDeviceId, navHref } from './nav-items'
 
-export function BottomTabBar({ fallbackDeviceId }: { fallbackDeviceId: number | null }) {
+export function BottomTabBar({
+  fallbackDeviceId,
+  knownDeviceIds,
+}: {
+  fallbackDeviceId: number | null
+  knownDeviceIds: readonly number[]
+}) {
   const pathname = usePathname()
-  const deviceId = navDeviceId(pathname, fallbackDeviceId)
+  const deviceId = navDeviceId(pathname, fallbackDeviceId, knownDeviceIds)
 
   return (
     <nav

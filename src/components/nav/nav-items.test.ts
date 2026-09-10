@@ -47,14 +47,34 @@ describe('isNavActive', () => {
 })
 
 describe('navDeviceId', () => {
+  const KNOWN = [1, 2, 3]
+
   it('網址優先於備援值', () => {
     // 這是關鍵：從切換器跳到設備 2 的那一次請求，伺服端的 cookie 還是 1。
     // 若採用 cookie，畫面顯示設備 2 而分頁連結指向設備 1。
-    expect(navDeviceId('/d/2/water', 1)).toBe(2)
+    expect(navDeviceId('/d/2/water', 1, KNOWN)).toBe(2)
   })
 
   it('網址沒有設備時才用備援值', () => {
-    expect(navDeviceId('/settings', 1)).toBe(1)
-    expect(navDeviceId('/settings', null)).toBeNull()
+    expect(navDeviceId('/settings', 1, KNOWN)).toBe(1)
+    expect(navDeviceId('/settings', null, KNOWN)).toBeNull()
+  })
+
+  it('網址裡的設備不存在時退回備援值，導覽列才不會是死路', () => {
+    // 打開已刪除設備的舊連結（或貼在拆掉的機器上的 QR）會走到 404。
+    // 只看網址的話，那一頁的五個分頁有四個指回同一個死掉的 id，
+    // 使用者每按一次就再撞一次 404。
+    expect(navDeviceId('/d/99999', 1, KNOWN)).toBe(1)
+    expect(navDeviceId('/d/99999/water', 2, KNOWN)).toBe(2)
+  })
+
+  it('一台設備都沒有時退回 null（呼叫端會導去設定頁）', () => {
+    expect(navDeviceId('/d/99999', null, [])).toBeNull()
+  })
+
+  it('停用的設備仍然走網址 —— 判準是「存在」不是「啟用中」', () => {
+    // 停用只是不出現在切換器與首頁，舊連結仍要能打開來查歷史。
+    // 若這裡改用啟用清單判斷，停用設備的分頁會全部跳到別台去。
+    expect(navDeviceId('/d/3/report', 1, KNOWN)).toBe(3)
   })
 })
