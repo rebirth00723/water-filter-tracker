@@ -119,3 +119,34 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * 日期與時間欄位在 iOS Safari 上會凸出邊框。
+ *
+ * 這兩種欄位的內容不是一般文字，而是 shadow DOM 裡的
+ * `::-webkit-datetime-edit`（整組編輯區）與 `::-webkit-date-and-time-value`
+ * （實際顯示日期的那一段）。iOS 給它們預設的 margin，而且**它們不隨容器收縮** ——
+ * 外框被 `w-full` 限制住，裡面的內容卻照自己的寬度排，於是文字跨出邊框。
+ * Chromium 不會這樣，所以在桌機上開發完全看不到。
+ *
+ * `max-width: 100%` 是硬上限，就算之後 iOS 的內部實作再變也不會凸出去；
+ * `min-width: 0` 讓欄位在 flex/grid 子項裡真的能被壓縮（預設 min-width 是 auto，
+ * 也就是「不小於內容」—— 那正是溢出的來源）。
+ */
+input[type="date"],
+input[type="time"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+input[type="date"]::-webkit-datetime-edit,
+input[type="time"]::-webkit-datetime-edit {
+  padding: 0;
+}
+
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  margin: 0;
+  /* iOS 預設置中，靠左才和其他欄位的文字對齊 */
+  text-align: left;
+}

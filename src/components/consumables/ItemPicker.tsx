@@ -155,11 +155,18 @@ export function ItemPicker({
             <ItemForm
               categoryId={stage.id}
               onCreated={(created) => {
-                // 就地新增之後立刻選用它 —— 這是這條路徑存在的全部理由
+                /*
+                 * 就地新增之後立刻選用它 —— 這是這條路徑存在的全部理由。
+                 *
+                 * 數量用剛存下的 `defaultQty`，與上面 `pick()` 走既有耗材時一致。
+                 * 這裡原本寫死 1：使用者在更換表單裡新增耗材、填了預設數量 3，
+                 * 帶進清單的卻是 1，而從挑選器選既有耗材時又是對的 ——
+                 * 於是症狀變成「有時候有效、有時候沒效」。
+                 */
                 onPick({
                   itemId: created.id,
                   categoryId: created.categoryId,
-                  qty: 1,
+                  qty: created.defaultQty,
                   name: created.name,
                 })
                 close()

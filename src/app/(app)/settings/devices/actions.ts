@@ -344,8 +344,14 @@ export const addItem = authedAction
       after: row,
     })
     revalidateAll()
-    // 回傳 id 讓更換表單裡的「就地新增」可以立刻選用它
-    return { id: row.id, name: row.name, categoryId: cat.id }
+    /*
+     * 回傳 id 讓更換表單裡的「就地新增」可以立刻選用它。
+     *
+     * **`defaultQty` 必須一起回傳**：那條路徑要把剛建好的耗材加進更換清單，
+     * 而加進去的數量就是它。取 `row` 而不是 `parsedInput` ——
+     * 以資料庫實際存下的值為準。
+     */
+    return { id: row.id, name: row.name, categoryId: cat.id, defaultQty: row.defaultQty }
   })
 
 export const editItem = authedAction

@@ -31,7 +31,7 @@ export function ItemForm({
 }: {
   categoryId: number
   item?: Item
-  onCreated?: (created: { id: number; name: string; categoryId: number }) => void
+  onCreated?: (created: { id: number; name: string; categoryId: number; defaultQty: number }) => void
   onDone?: () => void
   onCancel?: () => void
 }) {
