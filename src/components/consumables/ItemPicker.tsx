@@ -122,7 +122,7 @@ export function ItemPicker({
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
                         <span className="truncate text-sm">{it.name}</span>
-                        {it.defaultQty > 1 && <Badge tone="muted">預設 ×{it.defaultQty}</Badge>}
+                        {it.defaultQty > 1 && <Badge tone="muted">每次 ×{it.defaultQty}</Badge>}
                       </span>
                       <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                         {[

@@ -137,7 +137,7 @@ export function CategoryList({
                                 <span className="truncate text-sm">{it.name}</span>
                                 {!it.active && <Badge tone="muted">停用</Badge>}
                                 {it.defaultQty > 1 && (
-                                  <Badge tone="muted">預設 ×{it.defaultQty}</Badge>
+                                  <Badge tone="muted">每次 ×{it.defaultQty}</Badge>
                                 )}
                               </span>
                               {it.brand && (

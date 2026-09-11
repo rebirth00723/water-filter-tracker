@@ -10,9 +10,24 @@ import { ConfirmButton } from '@/components/forms/ConfirmButton'
 import { Badge, Button, Card, ColorDot, EmptyState } from '@/components/ui'
 import { Drawer } from '@/components/ui/Drawer'
 import { fmtZh } from '@/lib/date'
+import type { EventType } from '@/lib/db/schema'
 import type { EventRow } from '@/lib/events-store'
 import { EventForm, type EventFormTemplate } from './EventForm'
 import type { PickerCategory } from '@/lib/picker-data'
+
+/**
+ * 事件型別的徽章。
+ *
+ * **用 Record 而不是三元鏈。** 原本寫的是 `isReplace ? '更換' : '新購'`，
+ * 於是 ADJUST 掉進 else 被標成「新購」，旁邊再補一個「盤點調整」——
+ * 同一筆紀錄上出現兩個互相矛盾的標籤。
+ * 這個表以 EventType 為索引，日後多一種型別會是編譯錯誤而不是預設值。
+ */
+const TYPE_BADGE: Record<EventType, { label: string; tone: 'accent' | 'muted' | 'warning' }> = {
+  REPLACE: { label: '更換', tone: 'accent' },
+  PURCHASE: { label: '新購', tone: 'muted' },
+  ADJUST: { label: '盤點', tone: 'warning' },
+}
 
 export function EventList({
   deviceId,
@@ -46,7 +61,12 @@ export function EventList({
         <p className="text-xs text-muted-foreground">
           更換會成為下次到期日的起算點；新購只計入庫存與成本。
         </p>
-        <Button size="sm" disabled={!canRecord} onClick={() => setAdding(true)}>
+        <Button
+          size="sm"
+          className="shrink-0 whitespace-nowrap"
+          disabled={!canRecord}
+          onClick={() => setAdding(true)}
+        >
           <Plus className="size-4" aria-hidden />
           記一筆
         </Button>
@@ -83,11 +103,8 @@ export function EventList({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-medium">{fmtZh(ev.occurredOn)}</span>
-                        <Badge tone={isReplace ? 'accent' : 'muted'}>
-                          {isReplace ? '更換' : '新購'}
-                        </Badge>
-                        {ev.type === 'ADJUST' && <Badge tone="warning">盤點調整</Badge>}
-                        {!isReplace && ev.total > 0 && (
+                        <Badge tone={TYPE_BADGE[ev.type].tone}>{TYPE_BADGE[ev.type].label}</Badge>
+                        {ev.type === 'PURCHASE' && ev.total > 0 && (
                           <Badge tone="muted">
                             <span className="tabular">${ev.total}</span>
                           </Badge>
@@ -153,7 +170,7 @@ export function EventList({
                       <ConfirmButton
                         label="刪除"
                         variant="ghost"
-                        title={`刪除 ${fmtZh(ev.occurredOn)} 的${isReplace ? '更換' : '新購'}紀錄？`}
+                        title={`刪除 ${fmtZh(ev.occurredOn)} 的${TYPE_BADGE[ev.type].label}紀錄？`}
                         description={
                           <>
                             會移除 {ev.lines.length} 項明細

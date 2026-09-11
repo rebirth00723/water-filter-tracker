@@ -3,7 +3,8 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { refresh } from 'next/cache'
 import { db } from '@/lib/db'
-import { categories, devices, items } from '@/lib/db/schema'
+import { categories, devices, eventItems, events, items } from '@/lib/db/schema'
+import { currentDate } from '@/lib/date'
 import { getDevice } from '@/lib/devices'
 import { ActionError, authedAction } from '@/lib/safe-action'
 import {
@@ -328,19 +329,51 @@ export const deactivateCovered = authedAction
 export const addItem = authedAction
   .metadata({ name: 'item.create' })
   .inputSchema(createItem)
-  .action(async ({ parsedInput, ctx }) => {
-    const cat = getCategory(parsedInput.categoryId)
+  .action(async ({ parsedInput: { initialStock, ...fields }, ctx }) => {
+    const cat = getCategory(fields.categoryId)
     if (!cat) throw new ActionError('找不到這個種類，可能已經被刪除')
-    if (itemNameTaken(parsedInput.categoryId, parsedInput.name)) {
-      throw new ActionError(`「${cat.name}」底下已經有叫「${parsedInput.name}」的耗材了`)
+    if (itemNameTaken(fields.categoryId, fields.name)) {
+      throw new ActionError(`「${cat.name}」底下已經有叫「${fields.name}」的耗材了`)
     }
 
-    const row = db.insert(items).values(parsedInput).returning().get()
+    /*
+     * 新增耗材與登記現有庫存必須在同一個交易裡。
+     *
+     * 庫存不是耗材身上的欄位，而是事件的加總 —— 所以「我手上有 3 個」
+     * 只能表達成一筆 ADJUST（盤點）事件。分成兩個交易的話，
+     * 第二步失敗會留下一個「使用者以為登記過庫存、實際上是 0」的耗材，
+     * 而那正是這次要修掉的那種誤會。
+     */
+    const row = db.transaction((tx) => {
+      const item = tx.insert(items).values(fields).returning().get()
+
+      if (initialStock > 0) {
+        const ev = tx
+          .insert(events)
+          .values({
+            deviceId: cat.deviceId,
+            type: 'ADJUST',
+            occurredOn: currentDate(),
+            note: '新增耗材時登記的現有庫存',
+          })
+          .returning({ id: events.id })
+          .get()
+
+        tx.insert(eventItems)
+          .values({ eventId: ev.id, itemId: item.id, categoryId: cat.id, qty: initialStock })
+          .run()
+      }
+
+      return item
+    })
 
     ctx.audit({
       entity: 'item',
       entityId: row.id,
-      summary: `在「${cat.name}」新增耗材「${row.name}」`,
+      summary:
+        initialStock > 0
+          ? `在「${cat.name}」新增耗材「${row.name}」，並登記現有庫存 ${initialStock}`
+          : `在「${cat.name}」新增耗材「${row.name}」`,
       after: row,
     })
     revalidateAll()

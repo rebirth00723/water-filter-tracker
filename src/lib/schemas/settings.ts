@@ -6,6 +6,7 @@ import {
   optionalNtfyTopic,
   optionalDate,
   optionalPositiveInt,
+  nonNegativeInt,
   optionalText,
   positiveInt,
   requiredText,
@@ -90,11 +91,23 @@ export const itemFields = z.object({
   name: requiredText(40, '耗材名稱'),
   brand: optionalText(40),
   /** 更換表單的預設數量，省掉最常見的那一次點擊 */
-  defaultQty: positiveInt(99, '預設數量'),
+  defaultQty: positiveInt(99, '每次數量'),
   active: z.boolean(),
 })
 
-export const createItem = itemFields.extend({ categoryId: dbId })
+/**
+ * 新增耗材時多一個「目前庫存」。
+ *
+ * **只在新增時存在。** 庫存是由事件推算出來的（新購 +、更換 −、盤點 ±），
+ * 不是耗材身上的欄位。在編輯表單裡擺一個可改的庫存數字，
+ * 會讓人以為改它就能改掉歷史 —— 實際上得靠另一筆盤點。
+ * 新增是唯一「還沒有歷史」的時刻，在那裡登記手上現有的量才說得通。
+ */
+export const createItemFields = itemFields.extend({
+  initialStock: nonNegativeInt(999, '目前庫存'),
+})
+
+export const createItem = createItemFields.extend({ categoryId: dbId })
 export const updateItem = itemFields.extend({ id: dbId })
 export const itemRef = z.object({ id: dbId })
 

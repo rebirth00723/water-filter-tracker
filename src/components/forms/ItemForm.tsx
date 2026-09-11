@@ -8,12 +8,17 @@ import { toast } from 'sonner'
 import type { z } from 'zod'
 import { addItem, editItem } from '@/app/(app)/settings/devices/actions'
 import { CheckboxRow, Field, Input } from '@/components/ui'
-import { itemFields } from '@/lib/schemas/settings'
+import { createItemFields } from '@/lib/schemas/settings'
 import type { Item } from '@/lib/settings-store'
 import { actionErrorMessage } from './action-feedback'
 import { FormActions, FormError } from './FormShell'
 
-type In = z.input<typeof itemFields>
+/*
+ * 表單一律用「新增」那份 schema（多一個 initialStock）。
+ * 編輯時那個欄位不渲染，送出前也會被拆掉 ——
+ * 用兩份 schema 換得的只是型別上的整齊，代價是兩套 resolver 與兩個型別參數。
+ */
+type In = z.input<typeof createItemFields>
 
 /**
  * 耗材表單。
@@ -41,11 +46,12 @@ export function ItemForm({
   const fid = (name: string) => `${uid}-${name}`
 
   const form = useForm<In, unknown, In>({
-    resolver: zodResolver(itemFields, undefined, { raw: true }),
+    resolver: zodResolver(createItemFields, undefined, { raw: true }),
     defaultValues: {
       name: item?.name ?? '',
       brand: item?.brand ?? '',
       defaultQty: String(item?.defaultQty ?? 1),
+      initialStock: '0',
       active: item?.active ?? true,
     },
   })
@@ -83,8 +89,11 @@ export function ItemForm({
        */
       noValidate
       className="space-y-4 pt-2"
-      onSubmit={form.handleSubmit((values) =>
-        editing ? update.execute({ ...values, id: item.id }) : create.execute({ ...values, categoryId }),
+      onSubmit={form.handleSubmit(({ initialStock, ...rest }) =>
+        // initialStock 只屬於新增：編輯時明確拆掉，而不是丟給 zod 去 strip
+        editing
+          ? update.execute({ ...rest, id: item.id })
+          : create.execute({ ...rest, initialStock, categoryId }),
       )}
     >
       <Field label="耗材名稱" htmlFor={fid('name')} required error={form.formState.errors.name?.message}>
@@ -100,11 +109,19 @@ export function ItemForm({
         <Input id={fid('brand')} autoComplete="off" {...form.register('brand')} />
       </Field>
 
+      {/*
+        * 這兩個欄位放在一起，是因為它們**最容易被搞混**。
+        *
+        * 「每次數量」只是記一筆的時候預先帶進清單的數字，和手上有幾個無關；
+        * 「目前庫存」才是存貨。原本前者叫「預設數量」，於是有人填了 3
+        * 以為庫存就變成 3 —— 但庫存純粹由事件推算（新購 +、更換 −），
+        * 建立耗材這個動作本身不產生任何事件。
+        */}
       <Field
-        label="預設數量"
+        label="每次數量"
         htmlFor={fid('qty')}
         error={form.formState.errors.defaultQty?.message}
-        hint="更換表單會預先填入這個數量"
+        hint="記更換或新購時，預先帶幾個進清單。當下還是可以改，和庫存無關"
       >
         <Input
           id={fid('qty')}
@@ -115,6 +132,24 @@ export function ItemForm({
           {...form.register('defaultQty')}
         />
       </Field>
+
+      {!editing && (
+        <Field
+          label="目前庫存"
+          htmlFor={fid('stock')}
+          error={form.formState.errors.initialStock?.message}
+          hint="手上現在有幾個。會記成一筆盤點，之後靠新購與更換自動增減。沒有就留 0"
+        >
+          <Input
+            id={fid('stock')}
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={999}
+            {...form.register('initialStock')}
+          />
+        </Field>
+      )}
 
       <CheckboxRow
         label="啟用中"

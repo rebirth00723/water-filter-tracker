@@ -4,6 +4,7 @@ import {
   categoryFormSchema,
   createCategory,
   deviceFields,
+  createItemFields,
   itemFields,
   reorderDevices,
   updateCategory,
@@ -128,9 +129,36 @@ describe('itemFields', () => {
     expect(out.brand).toBeNull()
   })
 
-  it('預設數量不接受 0 或空白', () => {
+  it('每次數量不接受 0 或空白', () => {
     for (const v of ['0', '', '  ', '-3', '2.5']) {
       expect(itemFields.safeParse({ name: 'x', brand: '', defaultQty: v, active: true }).success).toBe(false)
+    }
+  })
+
+  it('itemFields 沒有 initialStock —— 那是新增才有的欄位', () => {
+    // 編輯耗材時不該出現「目前庫存」：庫存是事件的加總，
+    // 改那個數字不會、也不該改掉歷史。
+    expect('initialStock' in itemFields.shape).toBe(false)
+  })
+})
+
+describe('createItemFields 的目前庫存', () => {
+  const base = { name: 'PP 棉', brand: '', defaultQty: '2', active: true }
+
+  it('0 是合法的 —— 大多數人新增時手上沒有存貨', () => {
+    const out = createItemFields.parse({ ...base, initialStock: '0' })
+    expect(out.initialStock).toBe(0)
+    // 每次數量與目前庫存是兩個獨立的數字，不該互相影響
+    expect(out.defaultQty).toBe(2)
+  })
+
+  it('字串進、數字出', () => {
+    expect(createItemFields.parse({ ...base, initialStock: '7' }).initialStock).toBe(7)
+  })
+
+  it('拒絕負數、空白、小數與超出上限', () => {
+    for (const v of ['-1', '', '  ', '1.5', '1000']) {
+      expect(createItemFields.safeParse({ ...base, initialStock: v }).success).toBe(false)
     }
   })
 })
